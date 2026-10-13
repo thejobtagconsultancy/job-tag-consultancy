@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<title>Candidate Manager | The Job Tag</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one working column. Header with actions, status strip that doubles as a filter, filter panel, record list. Add/edit/view open in an overlay panel. Data lives in the user's Google Sheet. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#f7f8fb; --ink:#16202c; --muted:#59667a; --line:#dce1e8;
+  --accent:#2a5bd7; --accent-ink:#ffffff; --accent-soft:#e6edfc;
+  --danger:#bf3636; --danger-soft:#fbe9e9;
+  --font-ui:'Hanken Grotesk',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --radius:8px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10161f; --surface:#18212c; --surface-2:#1d2733; --ink:#e8edf4; --muted:#9aa7b8; --line:#2a3646;
+    --accent:#7ba0ff; --accent-ink:#0d1626; --accent-soft:#1f2c4a; --danger:#ff8f8f; --danger-soft:#3a2024;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10161f; --surface:#18212c; --surface-2:#1d2733; --ink:#e8edf4; --muted:#9aa7b8; --line:#2a3646;
+  --accent:#7ba0ff; --accent-ink:#0d1626; --accent-soft:#1f2c4a; --danger:#ff8f8f; --danger-soft:#3a2024;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:24px 48px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font-size:1.65rem;line-height:1.15;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:1rem;margin:0}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.top .sub{color:var(--muted);margin-top:4px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:.55rem .95rem;font-weight:600;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.link{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.danger.solid{background:var(--danger);color:var(--surface);border-color:var(--danger)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+
+.banner{background:var(--danger-soft);color:var(--ink);border:1px solid var(--danger);border-radius:var(--radius);padding:.7rem .9rem}
+
+.strip{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center}
+.total{display:flex;align-items:baseline;gap:10px}
+.total b{font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums;font-weight:700}
+.total span{color:var(--muted);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1 1 320px;align-items:center}
+.fchip{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:999px;padding:.25rem .7rem;font-size:.85rem;font-weight:600;cursor:pointer;display:inline-flex;gap:.45rem;align-items:center}
+.fchip i{font-style:normal;font-variant-numeric:tabular-nums;color:var(--muted)}
+.fchip:hover{border-color:var(--accent)}
+.fchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.fchip[aria-pressed="true"] i{color:var(--accent-ink);opacity:.85}
+
+input,select,textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:.55rem .65rem;min-height:40px}
+textarea{resize:vertical}
+.filters{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
+@media (max-width:860px){.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ff{display:flex;flex-direction:column;gap:4px;min-width:0}
+.lbl{font-weight:600;font-size:.82rem;color:var(--muted)}
+.rng{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.frow{display:flex;justify-content:flex-end}
+.count{color:var(--muted);font-size:.9rem;margin-top:-6px}
+
+.list{display:flex;flex-direction:column;gap:8px}
+.rec{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,.9fr) minmax(0,1fr);gap:6px 18px;align-items:center;padding:.8rem 1rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);cursor:pointer}
+.rec:hover{border-color:var(--accent)}
+.rec .who{min-width:0}
+.rec .nm{background:none;border:0;padding:0;font-weight:700;font-size:1rem;cursor:pointer;text-align:left;max-width:100%;overflow-wrap:anywhere}
+.rec .no{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-right:8px}
+.rec .line{color:var(--muted);font-size:.88rem;overflow-wrap:anywhere}
+.rec .ph{font-family:var(--font-mono);font-size:.85rem;color:var(--muted)}
+.rec .facts{font-size:.9rem;display:flex;flex-direction:column;gap:2px;min-width:0}
+.rec .facts span{color:var(--muted)}
+.rec .facts b{font-variant-numeric:tabular-nums;font-weight:600}
+.rec .sk{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.tag{background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:0 .4rem;font-size:.8rem;color:var(--ink)}
+.iv{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0}
+.pill{--h:#7b8794;font-weight:600;font-size:.8rem;border-radius:999px;border:1px solid color-mix(in srgb,var(--h) 35%,var(--surface));background:color-mix(in srgb,var(--h) 14%,var(--surface));color:color-mix(in srgb,var(--h) 65%,var(--ink));padding:.1rem .6rem}
+.pill.none{font-weight:500}
+.stsel{--h:#7b8794;font-weight:600;font-size:.85rem;border-radius:999px;border:1px solid color-mix(in srgb,var(--h) 35%,var(--surface));background:color-mix(in srgb,var(--h) 14%,var(--surface));color:color-mix(in srgb,var(--h) 65%,var(--ink));padding:.3rem .6rem;min-height:34px;width:auto}
+.st-lead{--h:#5a7fb8}.st-apply{--h:#c48a1a}.st-selected{--h:#2e9d5a}.st-rejected{--h:#cc4a4a}
+.rs-pending{--h:#c48a1a}.rs-selected{--h:#2e9d5a}.rs-rejected{--h:#cc4a4a}.rs-on-hold{--h:#5a7fb8}.rs-did-not-attend{--h:#7b8794}
+@media (max-width:760px){.rec{grid-template-columns:minmax(0,1fr)}}
+
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);padding:36px 20px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty p{color:var(--muted);max-width:50ch}
+.empty h2{font-size:1.15rem}
+
+.overlay{position:fixed;inset:0;background:rgba(8,12,20,.55);overflow:auto;padding-block:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-bottom));padding-inline:16px;display:flex;z-index:10}
+.panel{background:var(--surface);color:var(--ink);width:min(780px,100%);margin:auto;border-radius:12px;border:1px solid var(--line);position:relative}
+.ph-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 20px 6px}
+.ph-body{padding:6px 20px 18px;display:flex;flex-direction:column;gap:18px}
+.ph-foot{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 20px;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;border-radius:0 0 12px 12px}
+.ph-foot .msg{margin-right:auto;color:var(--danger);font-size:.9rem;min-width:0;flex:1 1 220px}
+fieldset{border:0;padding:0;margin:0;min-width:0}
+legend{padding:0;margin-bottom:8px;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.wide{grid-column:1/-1}
+label{font-weight:600;font-size:.88rem}
+.hint{color:var(--muted);font-size:.8rem}
+.autono{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:.55rem .65rem;min-height:40px;font-family:var(--font-mono);color:var(--muted)}
+@media (max-width:620px){.grid{grid-template-columns:1fr}}
+
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:.2rem .3rem .2rem .7rem;background:var(--surface-2)}
+.opt label{font-weight:500;font-size:.9rem;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.opt input{width:auto;min-height:0;margin:0}
+.opt .x{border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:50%;width:22px;height:22px;line-height:1;padding:0}
+.opt .x:hover{color:var(--danger)}
+.addopt{display:flex;gap:8px;margin-top:6px}
+.addopt input{flex:1;min-width:0}
+
+.dl{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:8px 14px;margin:0}
+.dl dt{color:var(--muted);font-size:.88rem}
+.dl dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}
+@media (max-width:520px){.dl{grid-template-columns:1fr}.dl dt{margin-top:6px}}
+.mono{font-family:var(--font-mono)}
+a{color:var(--accent)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--surface);padding:.6rem 1rem;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.overlay{animation:fade .12s ease-out}@keyframes fade{from{opacity:0}to{opacity:1}}}
+</style>
+
+<style>
+[hidden]{display:none!important}
+body{margin:0}
+.me{color:var(--muted);margin-top:4px;overflow-wrap:anywhere}
+.gate{min-height:70vh;display:flex;align-items:center;justify-content:center}
+.gate-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 24px;width:min(420px,100%);display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.gate-card .sub{color:var(--muted)}
+.gate-msg{color:var(--danger);min-height:1.4em;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <h1>Candidate Manager</h1>
+    <p class="sub">Team access only. Sign in with your Google account.</p>
+    <div id="g-btn"></div>
+    <p class="gate-msg" id="gate-msg" role="alert"></p>
+  </div>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div>
+      <h1>Candidate Manager</h1>
+      <p class="sub" id="me"></p>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="btn-signout" type="button">Sign out</button>
+      <button class="btn" id="btn-reload" type="button">Reload</button>
+      <button class="btn" id="btn-export" type="button" hidden>Export to Excel</button>
+      <button class="btn primary" id="btn-add" type="button">+ Add candidate</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" role="alert" hidden></div>
+
+  <section class="strip" aria-label="Summary">
+    <div class="total"><b id="total">0</b><span>candidates in total</span></div>
+    <div class="chips" id="chips" role="group" aria-label="Filter by status"></div>
+  </section>
+
+  <section class="filters" aria-label="Search and filters">
+    <input id="q" type="search" placeholder="Search by name, mobile, company, location or remarks" aria-label="Search candidates">
+    <div class="fgrid">
+      <div class="ff"><label class="lbl" for="flt-gender">Gender</label><select id="flt-gender"></select></div>
+      <div class="ff"><label class="lbl" for="flt-apply">Want to Apply</label><select id="flt-apply"></select></div>
+      <div class="ff"><label class="lbl" for="flt-city">Current Location</label><select id="flt-city"></select></div>
+      <div class="ff"><label class="lbl" for="flt-pref">Preferred Location</label><select id="flt-pref"></select></div>
+      <div class="ff"><span class="lbl">Current Salary (&#8377; per month)</span><div class="rng"><input id="flt-cur-min" type="text" inputmode="numeric" placeholder="Min" aria-label="Current salary minimum"><input id="flt-cur-max" type="text" inputmode="numeric" placeholder="Max" aria-label="Current salary maximum"></div></div>
+      <div class="ff"><span class="lbl">Expected Salary (&#8377; per month)</span><div class="rng"><input id="flt-exp-min" type="text" inputmode="numeric" placeholder="Min" aria-label="Expected salary minimum"><input id="flt-exp-max" type="text" inputmode="numeric" placeholder="Max" aria-label="Expected salary maximum"></div></div>
+      <div class="ff"><label class="lbl" for="flt-result">Interview result</label><select id="flt-result"></select></div>
+      <div class="ff"><label class="lbl" for="flt-sort">Sort by</label>
+        <select id="flt-sort">
+          <option value="new">Newest first</option>
+          <option value="old">Oldest first</option>
+          <option value="no">By No.</option>
+          <option value="name">Name A to Z</option>
+          <option value="exp">Most experience</option>
+        </select></div>
+    </div>
+    <div class="frow"><button class="btn ghost" id="btn-clear" type="button">Clear search and filters</button></div>
+  </section>
+  <p class="count" id="count" aria-live="polite"></p>
+
+  <main class="list" id="list"></main>
+</div>
+
+<div class="overlay" id="ov" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+  /* ===== SETTINGS: change only these two lines (see the setup guide) ===== */
+  var CLIENT_ID="599955109529-3njqii2lbbvvs2b62n762867futtj439.apps.googleusercontent.com";
+  var API_URL="https://script.google.com/macros/s/AKfycbwJdrLkWQZRRPKLqXi3y6fBBJ2PbtNSAd0H1mDr8b0aljJuxq9dcg0vZbhu8YodU2iWdg/exec";
+  /* ======================================================================= */
+
+  var RESULTS=["Pending","Selected","Rejected","On hold","Did not attend"];
+  var GENDERS=["Male","Female","Other"];
+  var STATUSES=["Lead","Apply","Selected","Rejected"];
+
+  var F={
+    status:{label:"Status",type:"select",options:STATUSES,noBlank:1},
+    no:{label:"No."},
+    gender:{label:"Gender",type:"select",options:GENDERS},
+    apply:{label:"Want to Apply"},
+    name:{label:"Name",req:1},
+    education:{label:"Highest Education",ph:"e.g. B.Com, MBA, 12th pass"},
+    dob:{label:"DOB",type:"date"},
+    city:{label:"Current Location"},
+    prefCity:{label:"Preferred Location"},
+    phone:{label:"Mobile Number",type:"tel",mode:"tel",ph:"10-digit mobile number",req:1},
+    exp:{label:"Total Experience (years)",mode:"decimal",ph:"0 for fresher"},
+    company1:{label:"Past Company 1"},
+    company2:{label:"Past Company 2"},
+    company3:{label:"Past Company 3"},
+    curSalary:{label:"Current Salary (₹ per month)",mode:"numeric"},
+    expSalary:{label:"Expected Salary (₹ per month)",mode:"numeric"},
+    remarks:{label:"Remarks",type:"textarea",rows:3,wide:1},
+    int1Date:{label:"Interview 1 Date",type:"date"},
+    int1Result:{label:"Interview 1 Result",type:"select",options:RESULTS},
+    int1Notes:{label:"Interview 1 Notes",type:"textarea",rows:3,wide:1,ph:"Who interviewed, what was discussed, feedback"},
+    int2Date:{label:"Interview 2 Date",type:"date"},
+    int2Result:{label:"Interview 2 Result",type:"select",options:RESULTS},
+    int2Notes:{label:"Interview 2 Notes",type:"textarea",rows:3,wide:1,ph:"Who interviewed, what was discussed, feedback"}
+  };
+  var SECTIONS=[
+    {t:"Status",k:["status"]},
+    {t:"Candidate details",k:["no","gender","apply","name","education","dob","city","prefCity","phone","exp"]},
+    {t:"Past companies",k:["company1","company2","company3"]},
+    {t:"Salary",k:["curSalary","expSalary"]},
+    {t:"Remarks",k:["remarks"]},
+    {t:"Interview Details 1",k:["int1Date","int1Result","int1Notes"]},
+    {t:"Interview Details 2",k:["int2Date","int2Result","int2Notes"]}
+  ];
+  var CSV_KEYS=["status","no","gender","apply","name","education","dob","city","prefCity","phone","exp","company1","company2","company3","curSalary","expSalary","remarks","int1Date","int1Result","int1Notes","int2Date","int2Result","int2Notes"];
+
+  var token="", me={email:"",role:""};
+  var all=[], opts=[], loaded=false, busy=false;
+  var statusFilter="", editId=null, dupWarned=false, modalLocked=false, formOpen=false, lastFocus=null, toastTimer=null;
+
+  function $(s){return document.querySelector(s)}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+  function slug(s){return String(s).toLowerCase().replace(/\s+/g,"-")}
+  function digits(s){return String(s||"").replace(/\D/g,"")}
+  function isAdmin(){return me.role==="admin"}
+  function money(v){var n=Number(String(v).replace(/,/g,""));return isNaN(n)||v===""?esc(v):"₹"+n.toLocaleString("en-IN")}
+  function fmtDate(s){try{var d=new Date(String(s).replace(" ","T"));return isNaN(d)?"":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}catch(e){return ""}}
+  function fmtDay(ymd){if(!ymd)return "";var p=String(ymd).split("-");if(p.length!==3||isNaN(+p[0]))return ymd;return fmtDate(new Date(+p[0],+p[1]-1,+p[2]).toISOString())}
+  function applyOf(c){return Array.isArray(c.apply)?c.apply:[]}
+  function stOf(c){return c.status||"Lead"}
+  function num(x){var n=parseFloat(String(x==null?"":x).replace(/,/g,""));return isNaN(n)?null:n}
+  function inRange(val,min,max){
+    var lo=num(min),hi=num(max);
+    if(lo===null&&hi===null)return true;
+    var n=num(val);if(n===null)return false;
+    if(lo!==null&&n<lo)return false;
+    if(hi!==null&&n>hi)return false;
+    return true;
+  }
+  function toast(m){var t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true},3200)}
+  function showBanner(m){var b=$("#banner");if(m){b.textContent=m;b.hidden=false}else{b.hidden=true}}
+  function allOptions(){
+    var seen={},out=[];
+    opts.concat.apply(opts,all.map(applyOf)).forEach(function(o){if(o&&!seen[o]){seen[o]=1;out.push(o)}});
+    return out;
+  }
+
+  /* ---------- sign-in ---------- */
+  function jwtExp(t){try{var p=JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));return p.exp*1000}catch(e){return 0}}
+  function getStored(){try{var t=sessionStorage.getItem("jt_token");return t&&jwtExp(t)>Date.now()+60000?t:""}catch(e){return ""}}
+  function store(t){try{sessionStorage.setItem("jt_token",t)}catch(e){}}
+  function clearStored(){try{sessionStorage.removeItem("jt_token")}catch(e){}}
+  function gateMsg(m){$("#gate-msg").textContent=m||""}
+  function showGate(msg){
+    token="";clearStored();
+    $("#app").hidden=true;$("#gate").hidden=false;gateMsg(msg);
+    closeOvQuiet();
+    try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}
+  }
+  function showApp(){$("#gate").hidden=true;$("#app").hidden=false}
+  function signOut(){loaded=false;all=[];opts=[];showGate("")}
+
+  function onCredential(resp){
+    token=resp&&resp.credential||"";
+    if(!token)return;
+    store(token);enter();
+  }
+  async function enter(){
+    gateMsg("Checking your access...");
+    await load(true);
+  }
+  function initGoogle(tries){
+    if(window.google&&google.accounts&&google.accounts.id){
+      google.accounts.id.initialize({client_id:CLIENT_ID,callback:onCredential,auto_select:true,cancel_on_tap_outside:false});
+      google.accounts.id.renderButton($("#g-btn"),{theme:"outline",size:"large",text:"signin_with",shape:"rectangular"});
+      return;
+    }
+    if(tries>40){gateMsg("Google sign-in could not load. Check your internet connection and reload the page.");return}
+    setTimeout(function(){initGoogle(tries+1)},250);
+  }
+
+  /* ---------- server calls ---------- */
+  async function api(action,payload){
+    var body=Object.assign({action:action,idToken:token},payload||{});
+    var res;
+    try{res=await fetch(API_URL,{method:"POST",body:JSON.stringify(body),redirect:"follow"})}
+    catch(e){throw {code:"network",message:"Could not reach the server. Check your internet connection."}}
+    var data;
+    try{data=await res.json()}catch(e){throw {code:"server",message:"The server sent an unexpected reply. Try again in a moment."}}
+    if(data&&data.error)throw {code:data.error,message:data.message||"Something went wrong.",email:data.email};
+    return data;
+  }
+  /* Returns text to show. Sign-in problems send the person back to the sign-in screen. */
+  function failText(e){
+    if(e&&e.code==="auth"){showGate(e.message||"Your sign-in expired. Please sign in again.");return ""}
+    if(e&&e.code==="not_allowed"){showGate((e.email?e.email+" is":"This email is")+" not on the team list. Ask an admin to add you.");return ""}
+    if(e&&e.code==="forbidden")return "Only an admin can do this.";
+    return (e&&e.message)||"Something went wrong. Try again.";
+  }
+
+  function normalize(c){
+    c.apply=Array.isArray(c.apply)?c.apply:[];
+    c.id=String(c.no);
+    return c;
+  }
+  async function load(first){
+    $("#btn-reload").disabled=true;
+    try{
+      var d=await api("list");
+      me={email:d.email,role:d.role};
+      all=(d.candidates||[]).map(normalize);
+      opts=d.options||[];
+      loaded=true;showBanner("");
+      $("#me").textContent="Signed in as "+me.email+" ("+(isAdmin()?"admin":"team member")+")";
+      $("#btn-export").hidden=!isAdmin();
+      showApp();render();if(formOpen)renderApplyBox([]);
+    }catch(e){
+      var t=failText(e);
+      if(t){
+        if(first||!loaded){showGate(t)}else{showBanner(t)}
+      }
+    }
+    $("#btn-reload").disabled=false;
+  }
+
+  /* ---------- list ---------- */
+  function visible(){
+    var q=$("#q").value.trim().toLowerCase(), g=$("#flt-gender").value, ap=$("#flt-apply").value, city=$("#flt-city").value,
+        pref=$("#flt-pref").value, res=$("#flt-result").value, sort=$("#flt-sort").value;
+    var rows=all.filter(function(c){
+      if(statusFilter&&stOf(c)!==statusFilter)return false;
+      if(g&&c.gender!==g)return false;
+      if(ap&&applyOf(c).indexOf(ap)<0)return false;
+      if(city&&c.city!==city)return false;
+      if(pref&&c.prefCity!==pref)return false;
+      if(res&&c.int1Result!==res&&c.int2Result!==res)return false;
+      if(!inRange(c.curSalary,$("#flt-cur-min").value,$("#flt-cur-max").value))return false;
+      if(!inRange(c.expSalary,$("#flt-exp-min").value,$("#flt-exp-max").value))return false;
+      if(q){
+        var hay=CSV_KEYS.map(function(k){return k==="apply"?applyOf(c).join(" "):(c[k]||"")}).join(" ").toLowerCase();
+        var phoneHit=/^[\d\s+\-]+$/.test(q)&&digits(q)&&digits(c.phone).indexOf(digits(q))>=0;
+        if(hay.indexOf(q)<0&&!phoneHit)return false;
+      }
+      return true;
+    });
+    rows.sort(function(a,b){
+      if(sort==="name")return String(a.name||"").localeCompare(String(b.name||""));
+      if(sort==="exp")return (parseFloat(b.exp)||0)-(parseFloat(a.exp)||0);
+      if(sort==="no")return (Number(a.no)||0)-(Number(b.no)||0);
+      var x=String(a.createdAt||""),y=String(b.createdAt||"");
+      return sort==="old"?x.localeCompare(y):y.localeCompare(x);
+    });
+    return rows;
+  }
+
+  function fillSelect(sel,first,values){
+    var cur=sel.value;
+    sel.innerHTML='<option value="">'+first+'</option>'+values.map(function(v){return '<option>'+esc(v)+'</option>'}).join("");
+    if(values.indexOf(cur)>=0)sel.value=cur;
+  }
+
+  function ivPill(label,c,n){
+    var r=c["int"+n+"Result"],d=c["int"+n+"Date"];
+    if(!r&&!d)return '<span class="pill none">'+label+': not set</span>';
+    return '<span class="pill rs-'+slug(r||"pending")+'">'+label+': '+esc(r||"Pending")+(d?' · '+esc(fmtDay(d)):"")+'</span>';
+  }
+
+  function render(){
+    $("#total").textContent=all.length;
+    var counts={};STATUSES.forEach(function(s){counts[s]=0});
+    all.forEach(function(c){var s=stOf(c);counts[s]=(counts[s]||0)+1});
+    $("#chips").innerHTML='<button type="button" class="fchip" data-st="" aria-pressed="'+(statusFilter===""?"true":"false")+'">All <i>'+all.length+'</i></button>'+
+      STATUSES.map(function(s){return '<button type="button" class="fchip" data-st="'+esc(s)+'" aria-pressed="'+(statusFilter===s?"true":"false")+'">'+esc(s)+' <i>'+counts[s]+'</i></button>'}).join("");
+
+    function uniq(k){return Array.from(new Set(all.map(function(c){return c[k]}).filter(Boolean))).sort()}
+    fillSelect($("#flt-gender"),"All genders",GENDERS);
+    fillSelect($("#flt-apply"),"All job options",allOptions());
+    fillSelect($("#flt-city"),"All locations",uniq("city"));
+    fillSelect($("#flt-pref"),"All locations",uniq("prefCity"));
+    fillSelect($("#flt-result"),"Any result",RESULTS);
+
+    var rows=visible(), list=$("#list");
+    $("#count").textContent=loaded&&all.length?("Showing "+rows.length+" of "+all.length+" candidates"):"";
+
+    if(!loaded){
+      list.innerHTML='<div class="empty"><h2>Loading your candidates</h2><p>This takes a few seconds.</p></div>';
+    }else if(!all.length){
+      list.innerHTML='<div class="empty"><h2>No candidates yet</h2><p>Add each candidate with their details, past companies, salary and both interview rounds.</p><button class="btn primary" type="button" data-act="add">Add the first candidate</button></div>';
+    }else if(!rows.length){
+      list.innerHTML='<div class="empty"><h2>No candidate matches</h2><p>Try a different search word or clear the filters.</p><button class="btn" type="button" data-act="clear">Clear search and filters</button></div>';
+    }else{
+      list.innerHTML=rows.map(function(c){
+        var locs=[c.city,c.prefCity&&("wants "+c.prefCity)].filter(Boolean).join(" · ");
+        return '<article class="rec" data-id="'+esc(c.id)+'">'+
+          '<div class="who"><span class="no">#'+esc(c.no)+'</span><button class="nm" type="button" data-act="view">'+esc(c.name||"Unnamed")+'</button>'+
+            (c.phone?'<div class="ph">'+esc(c.phone)+'</div>':'')+
+            '<div class="line">'+esc(locs||"No location added")+'</div></div>'+
+          '<div class="sk">'+(applyOf(c).length?applyOf(c).map(function(s){return '<span class="tag">'+esc(s)+'</span>'}).join(""):'<span class="line">No role selected</span>')+'</div>'+
+          '<div class="facts">'+
+            '<div><span>Experience </span><b>'+(c.exp!==""?esc(c.exp)+" yr":"–")+'</b></div>'+
+            '<div><span>Expects </span><b>'+(c.expSalary?money(c.expSalary)+"/mo":"–")+'</b></div></div>'+
+          '<div class="iv"><select class="stsel st-'+slug(stOf(c))+'" data-act="status" aria-label="Status of '+esc(c.name||"candidate")+'">'+
+            STATUSES.map(function(s){return '<option'+(s===stOf(c)?" selected":"")+'>'+esc(s)+'</option>'}).join("")+'</select>'+
+            ivPill("Interview 1",c,1)+ivPill("Interview 2",c,2)+'</div>'+
+        '</article>';
+      }).join("");
+    }
+    $("#btn-export").disabled=!rows.length;
+  }
+
+  /* ---------- overlay ---------- */
+  function openOv(html,lock,isForm){
+    lastFocus=document.activeElement;modalLocked=!!lock;formOpen=!!isForm;
+    var ov=$("#ov");ov.innerHTML=html;ov.hidden=false;ov.scrollTop=0;
+  }
+  function closeOvQuiet(){var ov=$("#ov");ov.hidden=true;ov.innerHTML="";editId=null;dupWarned=false;formOpen=false}
+  function closeOv(){
+    closeOvQuiet();
+    if(lastFocus&&lastFocus.focus)try{lastFocus.focus()}catch(e){}
+  }
+
+  function fieldHTML(k,val){
+    var f=F[k],id="f-"+k,ctl;
+    if(k==="no"){
+      return '<div class="fld"><label>'+esc(f.label)+'</label><div class="autono">'+(val?esc(val):"Assigned automatically")+'</div></div>';
+    }
+    if(k==="apply"){
+      return '<div class="fld wide"><label>'+esc(f.label)+' (tick all that apply)</label><div class="opts" id="applybox"></div>'+
+        '<div class="addopt"><input id="newopt" type="text" placeholder="Add a new job option, e.g. Accountant" aria-label="New job option"><button class="btn" type="button" data-act="addopt">Add option</button></div></div>';
+    }
+    if(f.type==="select"){
+      if(f.noBlank&&!val)val=f.options[0];
+      ctl='<select id="'+id+'">'+(f.noBlank?"":'<option value="">Select</option>')+f.options.map(function(o){return '<option'+(o===val?" selected":"")+'>'+esc(o)+'</option>'}).join("")+'</select>';
+    }else if(f.type==="textarea"){
+      ctl='<textarea id="'+id+'" rows="'+(f.rows||3)+'" placeholder="'+esc(f.ph||"")+'">'+esc(val)+'</textarea>';
+    }else{
+      ctl='<input id="'+id+'" type="'+(f.type||"text")+'"'+(f.mode?' inputmode="'+f.mode+'"':"")+' value="'+esc(val)+'" placeholder="'+esc(f.ph||"")+'" autocomplete="off">';
+    }
+    return '<div class="fld'+(f.wide?" wide":"")+'"><label for="'+id+'">'+esc(f.label)+(f.req?" *":"")+'</label>'+ctl+'</div>';
+  }
+
+  function renderApplyBox(extraSelected){
+    var box=$("#applybox");if(!box)return;
+    var sel=Array.prototype.map.call(box.querySelectorAll("input[data-opt]:checked"),function(i){return i.getAttribute("data-opt")});
+    (extraSelected||[]).forEach(function(s){if(sel.indexOf(s)<0)sel.push(s)});
+    var list=opts.slice();sel.forEach(function(s){if(list.indexOf(s)<0)list.push(s)});
+    box.innerHTML=list.length?list.map(function(o){
+      var inList=opts.indexOf(o)>=0;
+      return '<span class="opt"><label><input type="checkbox" data-opt="'+esc(o)+'"'+(sel.indexOf(o)>=0?" checked":"")+'> '+esc(o)+'</label>'+
+        (inList&&isAdmin()?'<button class="x" type="button" data-act="rmopt" data-opt="'+esc(o)+'" aria-label="Remove option '+esc(o)+'">×</button>':'')+'</span>';
+    }).join(""):'<span class="hint">No options yet. Type one below and press Add option.</span>';
+  }
+
+  function openForm(id){
+    editId=id||null;dupWarned=false;
+    var c=id?all.filter(function(x){return x.id===id})[0]:null;
+    var v=c||{};
+    var body=SECTIONS.map(function(s){
+      return '<fieldset><legend>'+esc(s.t)+'</legend><div class="grid">'+s.k.map(function(k){return fieldHTML(k,v[k]==null?"":v[k])}).join("")+'</div></fieldset>';
+    }).join("");
+    openOv('<div class="panel" role="dialog" aria-modal="true" aria-label="'+(c?"Edit candidate":"Add candidate")+'">'+
+      '<div class="ph-head"><h2>'+(c?"Edit candidate":"Add candidate")+'</h2><button class="btn ghost" type="button" data-act="close" aria-label="Close">Close</button></div>'+
+      '<form id="cform" class="ph-body" novalidate>'+body+'</form>'+
+      '<div class="ph-foot"><span class="msg" id="fmsg" role="alert"></span><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" id="btn-save" type="button" data-act="save">'+(c?"Save changes":"Save candidate")+'</button></div></div>',true,true);
+    renderApplyBox(c?applyOf(c):[]);
+    var no=$("#newopt");
+    if(no)no.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();addOption()}});
+    setTimeout(function(){var el=$("#f-name");if(el)el.focus()},30);
+  }
+
+  function openView(id){
+    var c=all.filter(function(x){return x.id===id})[0];if(!c)return;
+    var rows="";
+    SECTIONS.forEach(function(s){
+      var items=s.k.filter(function(k){
+        if(k==="apply")return applyOf(c).length;
+        return c[k]!==undefined&&c[k]!==null&&c[k]!=="";
+      });
+      if(!items.length)return;
+      rows+='<fieldset><legend>'+esc(s.t)+'</legend><dl class="dl">'+items.map(function(k){
+        var val=c[k],out;
+        if(k==="apply")out=applyOf(c).map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(" ");
+        else if(k==="phone")out='<span class="mono">'+esc(val)+'</span>';
+        else if(k==="curSalary"||k==="expSalary")out=money(val)+" per month";
+        else if(k==="exp")out=esc(val)+" years";
+        else if(k==="dob"||k==="int1Date"||k==="int2Date")out=esc(fmtDay(val));
+        else out=esc(val);
+        return '<dt>'+esc(F[k].label)+'</dt><dd>'+out+'</dd>';
+      }).join("")+'</dl></fieldset>';
+    });
+    var d=digits(c.phone),wa=d.length===10?"91"+d:(d.length===12&&d.indexOf("91")===0?d:"");
+    openOv('<div class="panel" role="dialog" aria-modal="true" aria-label="Candidate details">'+
+      '<div class="ph-head"><div><h2 style="font-size:1.3rem">'+esc(c.name||"Unnamed")+'</h2><p class="line" style="color:var(--muted)">'+(c.no?'No. '+esc(c.no)+' · ':'')+(c.createdAt?'Added '+esc(fmtDate(c.createdAt)):'')+'</p></div><button class="btn ghost" type="button" data-act="close" aria-label="Close">Close</button></div>'+
+      '<div class="ph-body">'+rows+'</div>'+
+      '<div class="ph-foot" data-id="'+esc(c.id)+'">'+(wa?'<a class="btn link" href="https://wa.me/'+wa+'" target="_blank" rel="noopener">Open WhatsApp</a>':"")+
+      '<span style="flex:1"></span>'+(isAdmin()?'<span id="delzone"><button class="btn danger" type="button" data-act="del">Delete</button></span>':'')+'<button class="btn primary" type="button" data-act="edit">Edit</button></div></div>',false,false);
+  }
+
+  /* ---------- job options ---------- */
+  async function addOption(){
+    var inp=$("#newopt");if(!inp)return;
+    var v=inp.value.trim().replace(/;/g,",");if(!v)return;
+    if(opts.some(function(o){return o.toLowerCase()===v.toLowerCase()})){toast("That option already exists");inp.value="";return}
+    try{
+      var d=await api("addOption",{name:v});
+      opts=d.options||opts;
+      inp.value="";renderApplyBox([v]);render();
+    }catch(e){var t=failText(e);if(t)toast(t)}
+  }
+  async function removeOption(o){
+    try{
+      var d=await api("removeOption",{name:o});
+      opts=d.options||opts.filter(function(x){return x!==o});
+      renderApplyBox([]);render();
+    }catch(e){var t=failText(e);if(t)toast(t)}
+  }
+
+  /* ---------- save, status, delete ---------- */
+  function gather(){
+    var rec={};
+    Object.keys(F).forEach(function(k){
+      if(k==="no"||k==="apply")return;
+      var el=$("#f-"+k);rec[k]=el?el.value.trim():"";
+    });
+    rec.apply=Array.prototype.map.call(document.querySelectorAll("#applybox input[data-opt]:checked"),function(i){return i.getAttribute("data-opt")});
+    return rec;
+  }
+  function setSaving(on){var b=$("#btn-save");if(!b)return;b.disabled=on;b.textContent=on?"Saving...":(editId?"Save changes":"Save candidate")}
+
+  async function saveForm(){
+    if(busy)return;
+    var msg=$("#fmsg"),rec=gather();msg.textContent="";
+    if(!rec.name){msg.textContent="Enter the candidate's name.";$("#f-name").focus();return}
+    if(!rec.phone){msg.textContent="Enter a mobile number so you can reach the candidate.";$("#f-phone").focus();return}
+    var d=digits(rec.phone).slice(-10);
+    var dup=all.filter(function(c){return c.id!==editId&&digits(c.phone).slice(-10)===d})[0];
+    if(dup&&!dupWarned){dupWarned=true;msg.textContent=dup.name+" already has this mobile number. Press Save again to add it anyway.";return}
+    var old=editId?all.filter(function(x){return x.id===editId})[0]:null;
+    if(old)rec.no=old.no;
+    busy=true;setSaving(true);
+    try{
+      var res=await api("save",{mode:old?"update":"create",rec:rec});
+      busy=false;
+      toast(old?"Changes saved":"Candidate added (No. "+res.no+")");
+      closeOv();await load();
+    }catch(e){
+      busy=false;
+      var t=failText(e);
+      if(t){setSaving(false);msg.textContent=t+" Press Reload on the page and check the list before saving again."}
+    }
+  }
+  async function changeStatus(id,val){
+    var c=all.filter(function(x){return x.id===id})[0];if(!c)return;
+    try{
+      await api("status",{no:c.no,status:val});
+      c.status=val;render();toast("Status set to "+val);
+    }catch(e){var t=failText(e);if(t)toast(t);render()}
+  }
+  async function removeCandidate(id){
+    var c=all.filter(function(x){return x.id===id})[0];if(!c)return;
+    try{
+      await api("delete",{no:c.no});
+      closeOv();toast("Candidate deleted");await load();
+    }catch(e){var t=failText(e);if(t)toast(t)}
+  }
+
+  /* ---------- export (admins) ---------- */
+  function csvCell(v){var s=String(v==null?"":v);return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+  function exportCSV(){
+    if(!isAdmin())return;
+    var rows=visible();if(!rows.length){toast("No candidates to export");return}
+    var head=CSV_KEYS.map(function(k){return csvCell(F[k].label)}).concat(["Date added"]).join(",");
+    var lines=rows.map(function(c){
+      return CSV_KEYS.map(function(k){return csvCell(k==="apply"?applyOf(c).join("; "):c[k])}).concat([csvCell(c.createdAt?fmtDate(c.createdAt):"")]).join(",");
+    });
+    var day=new Date();var name="candidates-"+day.getFullYear()+"-"+String(day.getMonth()+1).padStart(2,"0")+"-"+String(day.getDate()).padStart(2,"0")+".csv";
+    var blob=new Blob(["﻿"+head+"\r\n"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+    var url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},1500);
+    toast("Export downloaded");
+  }
+
+  /* ---------- events ---------- */
+  var FILTER_IDS=["#q","#flt-gender","#flt-apply","#flt-city","#flt-pref","#flt-cur-min","#flt-cur-max","#flt-exp-min","#flt-exp-max","#flt-result","#flt-sort"];
+  function clearFilters(){
+    statusFilter="";
+    FILTER_IDS.forEach(function(s){if(s!=="#flt-sort")$(s).value=""});
+    render();
+  }
+  $("#btn-add").addEventListener("click",function(){openForm()});
+  $("#btn-export").addEventListener("click",exportCSV);
+  $("#btn-reload").addEventListener("click",function(){load()});
+  $("#btn-signout").addEventListener("click",signOut);
+  $("#btn-clear").addEventListener("click",clearFilters);
+  FILTER_IDS.forEach(function(s){$(s).addEventListener("input",render)});
+  $("#chips").addEventListener("click",function(e){var b=e.target.closest("[data-st]");if(!b)return;statusFilter=b.getAttribute("data-st");render()});
+
+  $("#list").addEventListener("click",function(e){
+    var a=e.target.closest("[data-act]");
+    if(a&&a.getAttribute("data-act")==="add"){openForm();return}
+    if(a&&a.getAttribute("data-act")==="clear"){clearFilters();return}
+    if(e.target.closest(".stsel"))return;
+    var r=e.target.closest(".rec");if(r)openView(r.getAttribute("data-id"));
+  });
+  $("#list").addEventListener("change",function(e){
+    var s=e.target.closest(".stsel");if(!s)return;
+    changeStatus(s.closest(".rec").getAttribute("data-id"),s.value);
+  });
+
+  $("#ov").addEventListener("click",function(e){
+    if(e.target===this&&!modalLocked){closeOv();return}
+    var b=e.target.closest("[data-act]");if(!b)return;
+    var act=b.getAttribute("data-act"),foot=b.closest("[data-id]"),id=foot?foot.getAttribute("data-id"):null;
+    if(act==="close")closeOv();
+    else if(act==="save")saveForm();
+    else if(act==="addopt")addOption();
+    else if(act==="rmopt")removeOption(b.getAttribute("data-opt"));
+    else if(act==="edit"){var i=id;closeOv();openForm(i)}
+    else if(act==="del"){
+      $("#delzone").innerHTML='<button class="btn danger solid" type="button" data-act="del-yes">Yes, delete</button> <button class="btn" type="button" data-act="del-no">Keep</button>';
+    }else if(act==="del-no"){$("#delzone").innerHTML='<button class="btn danger" type="button" data-act="del">Delete</button>'}
+    else if(act==="del-yes")removeCandidate(id);
+  });
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#ov").hidden)closeOv()});
+
+  /* ---------- start ---------- */
+  if(CLIENT_ID.indexOf("PASTE_")===0||API_URL.indexOf("PASTE_")===0){
+    gateMsg("This page is not set up yet. Add the Google Client ID and the Web app URL at the top of the script in this file.");
+    return;
+  }
+  initGoogle(0);
+  token=getStored();
+  if(token)enter();
+})();
+</script>
+</body>
+</html>
