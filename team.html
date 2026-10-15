@@ -167,6 +167,9 @@ label{font-weight:600;font-size:.9rem}
 .gate-card .sub{font-size:1rem}
 .gate-msg{color:var(--danger);min-height:1.4em;overflow-wrap:anywhere}
 
+.skillrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.skillrow input{flex:1;min-width:0}
+
 </style>
 </head>
 <body>
@@ -302,6 +305,8 @@ label{font-weight:600;font-size:.9rem}
   function fmtDate(s){try{var d=new Date(String(s).replace(" ","T"));return isNaN(d)?"":d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}catch(e){return ""}}
   function fmtDay(ymd){if(!ymd)return "";var p=String(ymd).split("-");if(p.length!==3||isNaN(+p[0]))return ymd;return fmtDate(new Date(+p[0],+p[1]-1,+p[2]).toISOString())}
   function applyOf(c){return Array.isArray(c.apply)?c.apply:[]}
+  function skillsOf(c){return Array.isArray(c.skills)?c.skills:(has(c.skills)?[String(c.skills)]:[])}
+  function listOf(c,k){return k==="apply"?applyOf(c):k==="skills"?skillsOf(c):null}
   function stOf(c){return c.status||"Lead"}
   function num(x){var n=parseFloat(String(x==null?"":x).replace(/,/g,""));return isNaN(n)?null:n}
   function inRange(val,min,max){
@@ -385,6 +390,7 @@ label{font-weight:600;font-size:.9rem}
 
   function normalize(c){
     c.apply=Array.isArray(c.apply)?c.apply:[];
+    c.skills=skillsOf(c);
     c.id=String(c.no);
     return c;
   }
@@ -426,7 +432,7 @@ label{font-weight:600;font-size:.9rem}
       if(!inRange(c.curSalary,$("#flt-cur-min").value,$("#flt-cur-max").value))return false;
       if(!inRange(c.expSalary,$("#flt-exp-min").value,$("#flt-exp-max").value))return false;
       if(q){
-        var hay=CSV_KEYS.map(function(k){return k==="apply"?applyOf(c).join(" "):(c[k]||"")}).join(" ").toLowerCase();
+        var hay=CSV_KEYS.map(function(k){var l=listOf(c,k);return l?l.join(" "):(c[k]||"")}).join(" ").toLowerCase();
         var phoneHit=/^[\d\s+\-]+$/.test(q)&&digits(q)&&digits(c.phone).indexOf(digits(q))>=0;
         if(hay.indexOf(q)<0&&!phoneHit)return false;
       }
@@ -543,13 +549,17 @@ label{font-weight:600;font-size:.9rem}
       '<div class="fld wide"><label>'+ILABEL.Notes+'</label><textarea rows="3" data-p="Notes" placeholder="Who interviewed, what was discussed, feedback">'+esc(e.Notes||"")+'</textarea></div>'+
       '</div></div>';
   }
+  function skillRowHTML(v){
+    return '<div class="skillrow" data-row="skill"><input type="text" data-p="Skill" value="'+esc(v||"")+'" placeholder="e.g. MS Excel, Tally, Typing, Sales" aria-label="Skill" autocomplete="off"><button class="btn ghost sm" type="button" data-act="rm-row">Remove</button></div>';
+  }
   function renumber(){
-    ["work","iv"].forEach(function(kind){
-      var rows=$$('[data-row="'+kind+'"]'),max=kind==="work"?MAXW:MAXI;
-      rows.forEach(function(r,i){r.querySelector(".rc-title").textContent=(kind==="work"?"Company ":"Interview ")+(i+1)});
+    ["work","iv","skill"].forEach(function(kind){
+      var rows=$$('[data-row="'+kind+'"]'),max=kind==="work"?MAXW:kind==="iv"?MAXI:Infinity;
+      rows.forEach(function(r,i){
+        var t=r.querySelector(".rc-title");if(t)t.textContent=(kind==="work"?"Company ":"Interview ")+(i+1);
+        r.querySelector('[data-act="rm-row"]').hidden=(kind!=="work"&&rows.length===1);
+      });
       var add=$("#add-"+kind);if(add)add.hidden=rows.length>=max;
-      var rm=rows.length<=1&&kind==="iv";
-      rows.forEach(function(r){r.querySelector('[data-act="rm-row"]').hidden=(kind==="iv"&&rows.length===1)})
     });
   }
   function toggleExp(){
@@ -589,7 +599,8 @@ label{font-weight:600;font-size:.9rem}
         '<div id="expbox" class="subgrid" hidden><div class="grid">'+fieldHTML("exp",v.exp||"")+'</div>'+
         '<div id="worklist">'+works.map(workRowHTML).join("")+'</div>'+
         '<div><button class="btn sm addrow" id="add-work" type="button" data-act="add-work">+ Add another company</button></div></div></fieldset>'+
-      '<fieldset><legend>Skills</legend>'+grid(["skills"],v)+'</fieldset>'+
+      '<fieldset><legend>Skills</legend><div id="skilllist">'+(skillsOf(v).length?skillsOf(v):[""]).map(skillRowHTML).join("")+'</div>'+
+        '<div><button class="btn sm addrow" id="add-skill" type="button" data-act="add-skill">+ Add another skill</button></div></fieldset>'+
       '<fieldset><legend>Source of Candidate</legend>'+grid(["source"],v)+'</fieldset>'+
       '<fieldset><legend>Interview Details</legend><div id="ivlist">'+ints.map(ivRowHTML).join("")+'</div>'+
         '<div><button class="btn sm addrow" id="add-iv" type="button" data-act="add-iv">+ Add another interview</button></div></fieldset>'+
@@ -627,7 +638,7 @@ label{font-weight:600;font-size:.9rem}
     var wk=workOf(c);
     sec("Work Experience",rowsOf([["Type",esc(c.type),c.type],["Total Experience",esc(c.exp)+" years",c.exp]])+
       wk.map(function(e,i){return '<div class="vcard"><h3>Company '+(i+1)+'</h3>'+dl([["Company Name",esc(e.Company)],["Designation",esc(e.Role)],["Salary",e.Salary?money(e.Salary)+" per month":""],["Year",esc(e.Year)]].filter(function(r){return r[1]}))+'</div>'}).join(""));
-    sec("Skills",rowsOf([["Skills",esc(c.skills),c.skills]]));
+    sec("Skills",rowsOf([["Skills",skillsOf(c).map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(" "),skillsOf(c).length?"x":""]]));
     sec("Source of Candidate",rowsOf([["Source",esc(c.source),c.source]]));
     var iv=intsOf(c);
     sec("Interview Details",iv.map(function(e,i){return '<div class="vcard"><h3>Interview '+(i+1)+'</h3>'+dl([["Date",esc(fmtDay(e.Date))],["Result",esc(e.Result)],["Notes",esc(e.Notes)]].filter(function(r){return r[1]}))+'</div>'}).join(""));
@@ -655,7 +666,7 @@ label{font-weight:600;font-size:.9rem}
       block("Education",tbl([row("Highest Qualification",esc(c.education))]))+
       block("Job Preference",tbl([row("Applying For",applyOf(c).map(esc).join(", ")),row("Current Salary",has(c.curSalary)?money(c.curSalary)+" per month":""),row("Expected Salary",has(c.expSalary)?money(c.expSalary)+" per month":""),row("Joining Availability",esc(c.joining))]))+
       block("Work Experience",tbl([row("Experience Level",esc(c.type)),row("Total Experience",has(c.exp)?esc(c.exp)+" years":"")])+work)+
-      block("Skills",tbl([row("Skills",esc(c.skills))]));
+      block("Skills",tbl([row("Skills",skillsOf(c).map(esc).join(", "))]));
     return '<!doctype html><html><head><meta charset="utf-8"><title>Candidate Profile - '+esc(c.name||"")+' - The Job Tag Consultancy</title><style>'+
       '@page{size:A4;margin:16mm 14mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
       'body{font-family:Arial,Helvetica,sans-serif;color:#26242a;font-size:12.5px;line-height:1.5;margin:0}'+
@@ -709,11 +720,12 @@ label{font-weight:600;font-size:.9rem}
   }
 
   /* ---------- save, status, delete ---------- */
-  var STATIC_KEYS=["status","name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","skills","source","remarks"];
+  var STATIC_KEYS=["status","name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","source","remarks"];
   function gather(){
     var rec={};
     STATIC_KEYS.forEach(function(k){var el=$("#f-"+k);rec[k]=el?el.value.trim():""});
     rec.apply=$$("#applybox input[data-opt]:checked").map(function(i){return i.getAttribute("data-opt")});
+    rec.skills=$$('[data-row="skill"] [data-p="Skill"]').map(function(i){return i.value.trim()}).filter(Boolean);
     if(rec.type!=="Experience"){rec.exp=""}
     $$('[data-row="work"]').forEach(function(r,i){
       if(rec.type!=="Experience")return;
@@ -772,7 +784,7 @@ label{font-weight:600;font-size:.9rem}
     var head=CSV_KEYS.map(function(k){return csvCell(F[k]?F[k].label:k)}).concat(["Date added"]).join(",");
     head=head.replace(/^Status/,"Status");
     var lines=rows.map(function(c){
-      return CSV_KEYS.map(function(k){return csvCell(k==="apply"?applyOf(c).join("; "):c[k])}).concat([csvCell(c.createdAt?fmtDate(c.createdAt):"")]).join(",");
+      return CSV_KEYS.map(function(k){return csvCell(listOf(c,k)?listOf(c,k).join("; "):c[k])}).concat([csvCell(c.createdAt?fmtDate(c.createdAt):"")]).join(",");
     });
     var day=new Date();var name="candidates-"+day.getFullYear()+"-"+String(day.getMonth()+1).padStart(2,"0")+"-"+String(day.getDate()).padStart(2,"0")+".csv";
     var blob=new Blob(["﻿"+head+"\r\n"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
@@ -820,6 +832,7 @@ label{font-weight:600;font-size:.9rem}
     else if(act==="addopt")addOption();
     else if(act==="rmopt")removeOption(b.getAttribute("data-opt"));
     else if(act==="add-work"){if($$('[data-row="work"]').length<MAXW){$("#worklist").insertAdjacentHTML("beforeend",workRowHTML());renumber()}}
+    else if(act==="add-skill"){var sr=$("#skilllist");sr.insertAdjacentHTML("beforeend",skillRowHTML());renumber();var ins=sr.querySelectorAll("input");ins[ins.length-1].focus()}
     else if(act==="add-iv"){if($$('[data-row="iv"]').length<MAXI){$("#ivlist").insertAdjacentHTML("beforeend",ivRowHTML());renumber()}}
     else if(act==="rm-row"){var rc=b.closest("[data-row]");if(rc){rc.remove();renumber()}}
     else if(act==="pdf")downloadPDF(id);
@@ -830,6 +843,12 @@ label{font-weight:600;font-size:.9rem}
     else if(act==="del-yes")removeCandidate(id);
   });
   document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("#ov").hidden)closeOv()});
+  $("#ov").addEventListener("keydown",function(e){
+    if(e.key==="Enter"&&e.target.matches('[data-p="Skill"]')){
+      e.preventDefault();
+      if(has(e.target.value)){var sr=$("#skilllist");sr.insertAdjacentHTML("beforeend",skillRowHTML());renumber();var ins=sr.querySelectorAll("input");ins[ins.length-1].focus()}
+    }
+  });
 
   /* ---------- start ---------- */
   setTheme(getTheme());
