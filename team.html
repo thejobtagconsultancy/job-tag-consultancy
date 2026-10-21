@@ -170,6 +170,21 @@ label{font-weight:600;font-size:.9rem}
 .skillrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .skillrow input{flex:1;min-width:0}
 
+.note{background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;padding:.7rem .9rem;font-size:.93rem}
+
+/* applications inbox */
+.apps-btn .badge{display:inline-block;min-width:1.5em;padding:0 .4em;margin-left:.2em;border-radius:99px;background:var(--surface-2);color:var(--muted);font-size:.8rem;text-align:center}
+.apps-btn.has-new{border-color:var(--accent-text)}
+.apps-btn.has-new .badge{background:var(--accent);color:var(--accent-ink)}
+.app{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.app-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;align-items:baseline}
+.app-name{font-size:1.05rem}
+.app-act{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+.dzone{margin-left:auto}
+.dupwarn{background:var(--danger-soft);border:1px solid var(--danger);border-radius:8px;padding:.4rem .7rem;font-size:.9rem}
+.app .line{color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+.app .sk{display:flex;flex-wrap:wrap;gap:4px}
+
 </style>
 </head>
 <body>
@@ -197,6 +212,7 @@ label{font-weight:600;font-size:.9rem}
       <button class="btn ghost" id="btn-signout" type="button">Sign out</button>
       <button class="btn" id="btn-reload" type="button">Reload</button>
       <button class="btn" id="btn-export" type="button" hidden>Export to Excel</button>
+      <button class="btn apps-btn" id="btn-apps" type="button" title="Forms sent by candidates, waiting for you to review">Applications <b class="badge" id="apps-n">0</b></button>
       <button class="btn primary" id="btn-add" type="button">+ Add candidate</button>
     </div>
   </header>
@@ -287,11 +303,12 @@ label{font-weight:600;font-size:.9rem}
     for(n=1;n<=MAXW;n++)WF.forEach(function(p){CSV_KEYS.push("w"+n+p);F["w"+n+p]={label:"Company "+n+" "+WLABEL[p].replace("Company Name","Name").replace(" (₹ per month)","")}});
     CSV_KEYS.push("skills","source");
     for(n=1;n<=MAXI;n++)IF.forEach(function(p){CSV_KEYS.push("int"+n+p);F["int"+n+p]={label:"Interview "+n+" "+p}});
-    CSV_KEYS.push("remarks");
+    CSV_KEYS.push("remarks","resume");F.resume={label:"Resume Link"};
   })();
 
   var token="", me={email:"",role:""};
   var all=[], opts=[], loaded=false, busy=false;
+  var apps=[], pendingApp=null;
   var statusFilter="", editId=null, dupWarned=false, modalLocked=false, formOpen=false, lastFocus=null, toastTimer=null;
 
   function $(s){return document.querySelector(s)}
@@ -349,7 +366,7 @@ label{font-weight:600;font-size:.9rem}
     try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}
   }
   function showApp(){$("#gate").hidden=true;$("#app").hidden=false}
-  function signOut(){loaded=false;all=[];opts=[];showGate("")}
+  function signOut(){loaded=false;all=[];opts=[];apps=[];showGate("")}
 
   function onCredential(resp){
     token=resp&&resp.credential||"";
@@ -401,10 +418,12 @@ label{font-weight:600;font-size:.9rem}
       me={email:d.email,role:d.role};
       all=(d.candidates||[]).map(normalize);
       opts=d.options||[];
+      apps=(d.apps||[]).map(function(a){a.apply=Array.isArray(a.apply)?a.apply:[];a.skills=skillsOf(a);return a});
       loaded=true;showBanner("");
       $("#me").textContent="Signed in as "+me.email+" ("+(isAdmin()?"admin":"team member")+")";
       $("#btn-export").hidden=!isAdmin();
       showApp();render();if(formOpen)renderApplyBox([]);
+      renderAppsBadge();
     }catch(e){
       var t=failText(e);
       if(t){
@@ -513,7 +532,7 @@ label{font-weight:600;font-size:.9rem}
     lastFocus=document.activeElement;modalLocked=!!lock;formOpen=!!isForm;
     var ov=$("#ov");ov.innerHTML=html;ov.hidden=false;ov.scrollTop=0;
   }
-  function closeOvQuiet(){var ov=$("#ov");ov.hidden=true;ov.innerHTML="";editId=null;dupWarned=false;formOpen=false}
+  function closeOvQuiet(){var ov=$("#ov");ov.hidden=true;ov.innerHTML="";editId=null;dupWarned=false;formOpen=false;pendingApp=null}
   function closeOv(){
     closeOvQuiet();
     if(lastFocus&&lastFocus.focus)try{lastFocus.focus()}catch(e){}
@@ -580,13 +599,14 @@ label{font-weight:600;font-size:.9rem}
     }).join(""):'<span class="hint">No options yet. Type one below and press Add option.</span>';
   }
 
-  function openForm(id){
+  function openForm(id,prefill){
     editId=id||null;dupWarned=false;
     var c=id?all.filter(function(x){return x.id===id})[0]:null;
-    var v=c||{};
-    var works=c?workOf(c):[],ints=c?intsOf(c):[];
+    var v=c||prefill||{};
+    var works=workOf(v),ints=c?intsOf(c):[];
     if(!ints.length)ints=[{}];
-    var body=
+    var note=pendingApp?'<div class="note"><b>Application received'+(pendingApp.receivedAt?' on '+esc(fmtDate(pendingApp.receivedAt)):'')+'.</b> The candidate filled these details. Check them, add Status, Interview Details and Remarks if you need to, then press Approve and save.'+(pendingApp.resume?' <a href="'+esc(pendingApp.resume)+'" target="_blank" rel="noopener">Open the resume</a>':'')+'</div>':'';
+    var body=note+
       '<fieldset><legend>Status</legend>'+grid(["status","no"],v)+'</fieldset>'+
       '<fieldset><legend>Basic Details</legend>'+grid(["name","phone","email","gender","dob","city","prefCity"],v)+'</fieldset>'+
       '<fieldset><legend>Education</legend>'+grid(["education"],v)+'</fieldset>'+
@@ -605,11 +625,11 @@ label{font-weight:600;font-size:.9rem}
       '<fieldset><legend>Interview Details</legend><div id="ivlist">'+ints.map(ivRowHTML).join("")+'</div>'+
         '<div><button class="btn sm addrow" id="add-iv" type="button" data-act="add-iv">+ Add another interview</button></div></fieldset>'+
       '<fieldset><legend>Remarks</legend>'+grid(["remarks"],v)+'</fieldset>';
-    openOv('<div class="panel" role="dialog" aria-modal="true" aria-label="'+(c?"Edit candidate":"Add candidate")+'">'+
-      '<div class="ph-head"><h2>'+(c?"Edit candidate":"Add candidate")+'</h2><button class="btn ghost" type="button" data-act="close" aria-label="Close">Close</button></div>'+
+    openOv('<div class="panel" role="dialog" aria-modal="true" aria-label="'+(c?"Edit candidate":pendingApp?"Review application":"Add candidate")+'">'+
+      '<div class="ph-head"><h2>'+(c?"Edit candidate":pendingApp?"Review application":"Add candidate")+'</h2><button class="btn ghost" type="button" data-act="close" aria-label="Close">Close</button></div>'+
       '<form id="cform" class="ph-body" novalidate>'+body+'</form>'+
-      '<div class="ph-foot"><span class="msg" id="fmsg" role="alert"></span><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" id="btn-save" type="button" data-act="save">'+(c?"Save changes":"Save candidate")+'</button></div></div>',true,true);
-    renderApplyBox(c?applyOf(c):[]);
+      '<div class="ph-foot"><span class="msg" id="fmsg" role="alert"></span><button class="btn" type="button" data-act="close">Cancel</button><button class="btn primary" id="btn-save" type="button" data-act="save">'+(c?"Save changes":pendingApp?"Approve and save":"Save candidate")+'</button></div></div>',true,true);
+    renderApplyBox(applyOf(v));
     $("#f-type").addEventListener("change",toggleExp);
     toggleExp();renumber();
     var no=$("#newopt");
@@ -643,6 +663,7 @@ label{font-weight:600;font-size:.9rem}
     var iv=intsOf(c);
     sec("Interview Details",iv.map(function(e,i){return '<div class="vcard"><h3>Interview '+(i+1)+'</h3>'+dl([["Date",esc(fmtDay(e.Date))],["Result",esc(e.Result)],["Notes",esc(e.Notes)]].filter(function(r){return r[1]}))+'</div>'}).join(""));
     sec("Remarks",rowsOf([["Remarks",esc(c.remarks),c.remarks]]));
+    sec("Resume",/^https:\/\/(drive|docs)\.google\.com\//.test(c.resume||"")?dl([["Original file",'<a href="'+esc(c.resume)+'" target="_blank" rel="noopener">Open resume</a>']]):"");
     openOv('<div class="panel" role="dialog" aria-modal="true" aria-label="Candidate details">'+
       '<div class="ph-head"><div><h2 style="font-size:1.3rem">'+esc(c.name||"Unnamed")+'</h2><p class="sub">'+(c.no?'No. '+esc(c.no)+' · ':'')+'Status: '+esc(stOf(c))+(c.createdAt?' · Added '+esc(fmtDate(c.createdAt)):'')+'</p></div><button class="btn ghost" type="button" data-act="close" aria-label="Close">Close</button></div>'+
       '<div class="ph-body">'+s+'</div>'+
@@ -736,7 +757,7 @@ label{font-weight:600;font-size:.9rem}
     });
     return rec;
   }
-  function setSaving(on){var b=$("#btn-save");if(!b)return;b.disabled=on;b.textContent=on?"Saving...":(editId?"Save changes":"Save candidate")}
+  function setSaving(on){var b=$("#btn-save");if(!b)return;b.disabled=on;b.textContent=on?"Saving...":(editId?"Save changes":pendingApp?"Approve and save":"Save candidate")}
 
   async function saveForm(){
     if(busy)return;
@@ -751,14 +772,15 @@ label{font-weight:600;font-size:.9rem}
     if(old)rec.no=old.no;
     busy=true;setSaving(true);
     try{
-      var res=await api("save",{mode:old?"update":"create",rec:rec});
+      var res=pendingApp?await api("approve",{appId:pendingApp.appId,rec:rec}):await api("save",{mode:old?"update":"create",rec:rec});
       busy=false;
-      toast(old?"Changes saved":"Candidate added (No. "+res.no+")");
+      toast(old?"Changes saved":pendingApp?"Approved. Added as candidate No. "+res.no:"Candidate added (No. "+res.no+")");
       closeOv();await load();
     }catch(e){
       busy=false;
       var t=failText(e);
       if(t){setSaving(false);msg.textContent=t+" Press Reload on the page and check the list before saving again."}
+      if(e&&e.code==="not_found"&&pendingApp){setSaving(false);msg.textContent="This application was already handled by someone else. Close this form and press Reload."}
     }
   }
   async function changeStatus(id,val){
@@ -773,6 +795,46 @@ label{font-weight:600;font-size:.9rem}
     try{
       await api("delete",{no:c.no});
       closeOv();toast("Candidate deleted");await load();
+    }catch(e){var t=failText(e);if(t)toast(t)}
+  }
+
+  /* ---------- applications from the candidate link ---------- */
+  function renderAppsBadge(){
+    var b=$("#btn-apps");if(!b)return;
+    $("#apps-n").textContent=apps.length;
+    b.classList.toggle("has-new",apps.length>0);
+  }
+  function appCard(a){
+    var meta=[a.city,a.prefCity&&("wants "+a.prefCity)].filter(Boolean).join(" · ");
+    var exp=a.type==="Fresher"?"Fresher":(has(a.exp)?esc(a.exp)+" yr experience":(a.type||""));
+    return '<article class="app" data-aid="'+esc(a.appId)+'">'+
+      '<div class="app-top"><b class="app-name">'+esc(a.name||"Unnamed")+'</b><span class="line">'+(a.receivedAt?"Received "+esc(fmtDate(a.receivedAt)):"")+'</span></div>'+
+      '<div class="line"><span class="mono">'+esc(a.phone)+'</span>'+(a.email?" · "+esc(a.email):"")+'</div>'+
+      '<div class="line">'+esc([meta,exp,a.education].filter(Boolean).join(" · "))+'</div>'+
+      '<div class="sk">'+(a.apply.length?a.apply.map(function(s){return '<span class="tag">'+esc(s)+'</span>'}).join(""):'<span class="line">No role selected</span>')+'</div>'+
+      (a.dupNo?'<div class="dupwarn">This mobile number is already candidate No. '+esc(a.dupNo)+' ('+esc(a.dupName)+'). Check before approving.</div>':'')+
+      '<div class="app-act">'+
+        (/^https:\/\/drive\.google\.com\//.test(a.resume||"")?'<a class="btn sm link" href="'+esc(a.resume)+'" target="_blank" rel="noopener">Open resume</a>':'')+
+        '<button class="btn sm primary" type="button" data-act="app-review">Review and approve</button>'+
+        (isAdmin()?'<span class="dzone"><button class="btn sm danger" type="button" data-act="app-del">Discard</button></span>':'')+
+      '</div></article>';
+  }
+  function openApps(){
+    var list=apps.slice().sort(function(x,y){return String(y.receivedAt||"").localeCompare(String(x.receivedAt||""))});
+    openOv('<div class="panel" role="dialog" aria-modal="true" aria-label="Applications">'+
+      '<div class="ph-head"><div><h2 style="font-size:1.3rem">Applications to review</h2><p class="sub">'+(list.length?list.length+" waiting. Review each one, then approve it to add it as a candidate.":"Nothing is waiting.")+'</p></div><button class="btn ghost" type="button" data-act="close" aria-label="Close">Close</button></div>'+
+      '<div class="ph-body">'+(list.length?list.map(appCard).join(""):'<div class="empty"><h2>No new applications</h2><p>When a candidate fills in your link, it appears here.</p></div>')+'</div></div>',false,false);
+  }
+  function reviewApp(aid){
+    var a=apps.filter(function(x){return x.appId===aid})[0];if(!a)return;
+    closeOvQuiet();
+    pendingApp=a;
+    openForm(null,a);
+  }
+  async function discardApplication(aid){
+    try{
+      await api("discardApp",{appId:aid});
+      toast("Application discarded");await load();openApps();
     }catch(e){var t=failText(e);if(t)toast(t)}
   }
 
@@ -802,7 +864,8 @@ label{font-weight:600;font-size:.9rem}
     FILTER_IDS.forEach(function(s){if(s!=="#flt-sort")$(s).value=""});
     render();
   }
-  $("#btn-add").addEventListener("click",function(){openForm()});
+  $("#btn-add").addEventListener("click",function(){pendingApp=null;openForm()});
+  $("#btn-apps").addEventListener("click",openApps);
   $("#btn-export").addEventListener("click",exportCSV);
   $("#btn-reload").addEventListener("click",function(){load()});
   $("#btn-signout").addEventListener("click",signOut);
@@ -836,6 +899,10 @@ label{font-weight:600;font-size:.9rem}
     else if(act==="add-iv"){if($$('[data-row="iv"]').length<MAXI){$("#ivlist").insertAdjacentHTML("beforeend",ivRowHTML());renumber()}}
     else if(act==="rm-row"){var rc=b.closest("[data-row]");if(rc){rc.remove();renumber()}}
     else if(act==="pdf")downloadPDF(id);
+    else if(act==="app-review")reviewApp(b.closest("[data-aid]").getAttribute("data-aid"));
+    else if(act==="app-del"){b.closest(".dzone").innerHTML='<button class="btn sm danger solid" type="button" data-act="app-del-yes">Yes, discard</button> <button class="btn sm" type="button" data-act="app-del-no">Keep</button>'}
+    else if(act==="app-del-no"){b.closest(".dzone").innerHTML='<button class="btn sm danger" type="button" data-act="app-del">Discard</button>'}
+    else if(act==="app-del-yes")discardApplication(b.closest("[data-aid]").getAttribute("data-aid"));
     else if(act==="edit"){var i=id;closeOv();openForm(i)}
     else if(act==="del"){
       $("#delzone").innerHTML='<button class="btn danger solid" type="button" data-act="del-yes">Yes, delete</button> <button class="btn" type="button" data-act="del-no">Keep</button>';
