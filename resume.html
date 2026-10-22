@@ -83,6 +83,13 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
 .submit{width:100%;min-height:54px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:1.05rem;cursor:pointer}
 .submit:disabled{opacity:.6;cursor:default}
 .fine{color:var(--muted);font-size:.86rem;text-align:center;margin-top:12px}
+.progress{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 12px;margin:0 0 10px;border-bottom:1px solid var(--line)}
+.pg-row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:.9rem;margin-bottom:6px}
+.pg-row span{color:var(--muted);text-align:right}
+.pg-bar{position:relative;height:10px;border-radius:99px;background:var(--line);overflow:visible}
+.pg-bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--accent);transition:width .25s ease}
+.pg-bar.ready i{background:var(--ok)}
+.pg-bar u{position:absolute;left:90%;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.45;text-decoration:none}
 .hp{position:absolute!important;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 .done{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 20px;text-align:center}
 .done .tick{width:60px;height:60px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center;margin:0 auto 14px}
@@ -101,23 +108,28 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
 
   <div class="tip" id="inapp" hidden><b>Having trouble uploading your resume?</b> If you opened this page inside Facebook or Instagram, tap the three dots (⋮) or the share icon and choose <b>Open in browser</b>.</div>
 
+  <div class="progress" id="progress">
+    <div class="pg-row"><b id="pg-text">0% complete</b><span id="pg-note">Fill the fields marked * to continue</span></div>
+    <div class="pg-bar" role="progressbar" aria-label="Form progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="pg-bar"><i id="pg-fill"></i><u></u></div>
+  </div>
+
   <form id="f" novalidate autocomplete="on">
     <fieldset>
       <legend>Basic Details</legend>
       <div class="fld"><label for="name">Full Name *</label><input id="name" type="text" autocomplete="name" maxlength="100" required></div>
       <div class="fld"><label for="phone">Mobile Number *</label><input id="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="16" placeholder="10-digit mobile number" required></div>
-      <div class="fld"><label for="email">Email <span class="opt">(optional)</span></label><input id="email" type="email" inputmode="email" autocomplete="email" maxlength="120" placeholder="name@example.com"></div>
+      <div class="fld"><label for="email">Email *</label><input id="email" type="email" inputmode="email" autocomplete="email" maxlength="120" placeholder="name@example.com"></div>
       <div class="two">
-        <div class="fld"><label for="gender">Gender</label><select id="gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
-        <div class="fld"><label for="dob">Date of Birth</label><input id="dob" type="date" autocomplete="bday"></div>
+        <div class="fld"><label for="gender">Gender *</label><select id="gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+        <div class="fld"><label for="dob">Date of Birth * <span class="opt">(DD/MM/YYYY)</span></label><input id="dob" type="text" inputmode="numeric" autocomplete="bday" maxlength="10" placeholder="DD/MM/YYYY"></div>
       </div>
-      <div class="fld"><label for="city">Current Location</label><input id="city" type="text" autocomplete="address-level2" maxlength="80" placeholder="City or town where you live now"></div>
-      <div class="fld"><label for="prefCity">Preferred Location</label><input id="prefCity" type="text" maxlength="80" placeholder="Where would you like to work?"></div>
+      <div class="fld"><label for="city">Current Location * <span class="opt">(City / Area)</span></label><input id="city" type="text" autocomplete="address-level2" maxlength="80" placeholder="City or area where you live now"></div>
+      <div class="fld"><label for="prefCity">Preferred Location * <span class="opt">(City / Area)</span></label><input id="prefCity" type="text" maxlength="80" placeholder="Where would you like to work?"></div>
     </fieldset>
 
     <fieldset>
       <legend>Education</legend>
-      <div class="fld"><label for="education">Highest Qualification</label><input id="education" type="text" maxlength="100" placeholder="e.g. B.Com, MBA, 12th pass"></div>
+      <div class="fld"><label for="education">Highest Qualification *</label><input id="education" type="text" maxlength="100" placeholder="e.g. B.Com, MBA, 12th pass"></div>
     </fieldset>
 
     <fieldset>
@@ -126,14 +138,15 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
         <span class="lbl" id="lbl-apply">Which kinds of jobs are you interested in? * <span class="opt">(tick all that apply)</span></span>
         <div class="chips" id="applybox" role="group" aria-labelledby="lbl-apply"><span class="loading">Loading options...</span></div>
       </div>
-      <div class="fld"><label for="expSalary">Expected Salary <span class="opt">(₹ per month)</span></label><input id="expSalary" type="text" inputmode="numeric" maxlength="12" placeholder="e.g. 20000"></div>
-      <div class="fld"><label for="joining">Joining Availability</label>
+      <div class="fld" id="otherbox" hidden><label for="applyOther">Type the job you are looking for</label><input id="applyOther" type="text" maxlength="100" placeholder="e.g. Store Manager" autocomplete="off"></div>
+      <div class="fld"><label for="expSalary">Expected Salary * <span class="opt">(₹ per month)</span></label><input id="expSalary" type="text" inputmode="numeric" maxlength="12" placeholder="e.g. 20000"></div>
+      <div class="fld"><label for="joining">Joining Availability *</label>
         <select id="joining"><option value="">Select</option><option>Immediate</option><option>Within 15 days</option><option>Within 1 month</option><option>Within 2 months</option><option>3 months or more</option></select></div>
     </fieldset>
 
     <fieldset>
       <legend>Work Experience</legend>
-      <div class="fld"><label for="type">Are you a fresher or experienced?</label>
+      <div class="fld"><label for="type">Are you a fresher or experienced? *</label>
         <select id="type"><option value="">Select</option><option>Fresher</option><option>Experience</option></select></div>
       <div id="expbox" hidden>
         <div class="two">
@@ -146,7 +159,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     </fieldset>
 
     <fieldset>
-      <legend>Skills</legend>
+      <legend>Skills <span class="opt">(helps us match you)</span></legend>
       <div id="skilllist"></div>
       <button class="btn add" id="add-skill" type="button">+ Add another skill</button>
     </fieldset>
@@ -154,13 +167,13 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     <fieldset>
       <legend>Your Resume</legend>
       <div class="fld">
-        <span class="lbl" id="lbl-file">Upload your resume as a PDF * <span class="opt">(up to 2 MB)</span></span>
+        <span class="lbl" id="lbl-file">Upload your resume * <span class="opt">(PDF, Word, JPG or PNG, up to 5 MB)</span></span>
         <div class="drop">
-          <input id="file" type="file" accept="application/pdf,.pdf" aria-labelledby="lbl-file">
-          <label class="pick" for="file" id="pick">Choose PDF file</label>
+          <input id="file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png" aria-labelledby="lbl-file">
+          <label class="pick" for="file" id="pick">Choose file</label>
           <span class="fname" id="fname" aria-live="polite">No file chosen</span>
         </div>
-        <p class="hint">Do not have a PDF? Open your resume in Word or Google Docs and use Save as PDF.</p>
+        <p class="hint">No resume file? A clear photo of your resume also works.</p>
       </div>
     </fieldset>
 
@@ -170,6 +183,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
 
     <p class="err" id="err" role="alert" hidden></p>
     <button class="submit" id="send" type="submit">Submit my details</button>
+    <p class="fine" id="pg-hint">You need at least 90% of the form filled and all fields marked * to submit.</p>
     <p class="fine">This form is only for sharing your details and resume with us. It is not an application for any particular job post.</p>
   </form>
 
@@ -185,7 +199,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
 <script>
 (function(){
   var API_URL="https://script.google.com/macros/s/AKfycbwJdrLkWQZRRPKLqXi3y6fBBJ2PbtNSAd0H1mDr8b0aljJuxq9dcg0vZbhu8YodU2iWdg/exec";
-  var MAXW=5, MAX_BYTES=2*1024*1024, started=Date.now();
+  var MAXW=5, MAX_BYTES=5*1024*1024, started=Date.now();
   var WF=["Company","Role","Salary","Year"];
   var WLABEL={Company:"Company Name",Role:"Designation",Salary:"Salary (₹ per month)",Year:"Year"};
   var opts=[], optsLoaded=false, sending=false, fileObj=null;
@@ -218,8 +232,8 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     var box=$("#applybox");
     if(!optsLoaded){box.innerHTML='<span class="loading">Loading options...</span>';return}
     if(optsLoaded==="fail"){box.innerHTML='<span class="loading">The options could not be loaded. </span><button class="btn sm" type="button" id="retry-opts">Try again</button>';return}
-    if(!opts.length){box.innerHTML='<span class="loading">No options available right now. You can skip this part.</span>';return}
-    box.innerHTML=opts.map(function(o,i){return '<label class="chip"><input type="checkbox" data-opt="'+esc(o)+'"><span>'+esc(o)+'</span></label>'}).join("");
+    box.innerHTML=opts.map(function(o,i){return '<label class="chip"><input type="checkbox" data-opt="'+esc(o)+'"><span>'+esc(o)+'</span></label>'}).join("")+
+      '<label class="chip"><input type="checkbox" id="other-on"><span>Other</span></label>';
   }
   function loadOpts(){
     optsLoaded=false;renderOpts();
@@ -252,6 +266,9 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
   }
   $("#skilllist").insertAdjacentHTML("beforeend",skillRow());renumber();
   $("#type").addEventListener("change",toggleExp);
+  $("#applybox").addEventListener("change",function(e){
+    if(e.target.id==="other-on"){var on=e.target.checked;$("#otherbox").hidden=!on;if(on)$("#applyOther").focus()}
+  });
   $("#add-work").addEventListener("click",function(){if($$('[data-row="work"]').length<MAXW){$("#worklist").insertAdjacentHTML("beforeend",workRow());renumber()}});
   function addSkill(){var l=$("#skilllist");l.insertAdjacentHTML("beforeend",skillRow());renumber();var i=l.querySelectorAll("input");i[i.length-1].focus()}
   $("#add-skill").addEventListener("click",addSkill);
@@ -265,22 +282,31 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
   /* ---- resume file ---- */
   function showFile(){
     $("#fname").textContent=fileObj?fileObj.name+" ("+(fileObj.size/1024<1024?Math.max(1,Math.round(fileObj.size/1024))+" KB":(fileObj.size/1048576).toFixed(1)+" MB")+")":"No file chosen";
-    $("#pick").textContent=fileObj?"Change file":"Choose PDF file";
+    $("#pick").textContent=fileObj?"Change file":"Choose file";
+    progress();
   }
-  function checkPdf(f){
+  /* checks what is really inside the file (PDF, Word, JPG or PNG), not just its name */
+  function checkFile(f){
     return new Promise(function(res){
-      try{var r=new FileReader();r.onload=function(){var a=new Uint8Array(r.result);res(a.length>=5&&a[0]===37&&a[1]===80&&a[2]===68&&a[3]===70&&a[4]===45)};r.onerror=function(){res(false)};r.readAsArrayBuffer(f.slice(0,5))}
-      catch(e){res(false)}
+      try{
+        var r=new FileReader();
+        r.onload=function(){
+          var a=new Uint8Array(r.result),ext=((/\.([A-Za-z0-9]+)$/.exec(f.name)||[0,""])[1]).toLowerCase();
+          function is(sig){for(var i=0;i<sig.length;i++)if(a[i]!==sig[i])return false;return a.length>=sig.length}
+          res(is([37,80,68,70,45])||is([255,216,255])||is([137,80,78,71,13,10,26,10])||(ext==="doc"&&is([208,207,17,224,161,177,26,225]))||(ext==="docx"&&is([80,75,3,4])));
+        };
+        r.onerror=function(){res(false)};r.readAsArrayBuffer(f.slice(0,8));
+      }catch(e){res(false)}
     });
   }
   $("#file").addEventListener("change",function(){
     var f=this.files&&this.files[0];fileObj=null;showFile();hideErr();
     if(!f)return;
-    if(f.size>MAX_BYTES){fail("This file is too large. Please choose a PDF under 2 MB.",$("#file"));this.value="";return}
+    if(f.size>MAX_BYTES){fail("This file is too large. Please choose a file under 5 MB.",$("#file"));this.value="";return}
     if(!f.size){fail("This file is empty. Please choose another one.",$("#file"));this.value="";return}
     var inp=this;
-    checkPdf(f).then(function(ok){
-      if(!ok){fail("Please choose a PDF file.",inp);inp.value="";return}
+    checkFile(f).then(function(ok){
+      if(!ok){fail("Please choose a PDF, Word, JPG or PNG file.",inp);inp.value="";return}
       fileObj=f;showFile();
     });
   });
@@ -304,10 +330,68 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(",")[1]||"")};r.onerror=function(){rej({message:"The resume file could not be read. Please choose it again."})};r.readAsDataURL(f)});
   }
 
+  /* ---- date of birth typed as DD/MM/YYYY ---- */
+  $("#dob").addEventListener("input",function(){
+    var d=this.value.replace(/\D/g,"").slice(0,8),o=d;
+    if(d.length>4)o=d.slice(0,2)+"/"+d.slice(2,4)+"/"+d.slice(4);else if(d.length>2)o=d.slice(0,2)+"/"+d.slice(2);
+    this.value=o;
+  });
+  /* returns {iso:"YYYY-MM-DD"} or {err:"..."} */
+  function dobCheck(v){
+    var m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+    if(!m)return {err:"Please enter your date of birth as DD/MM/YYYY, for example 25/08/2001."};
+    var d=+m[1],mo=+m[2],y=+m[3],dt=new Date(y,mo-1,d);
+    if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return {err:"That date of birth does not look right. Please use DD/MM/YYYY."};
+    var now=new Date(),age=now.getFullYear()-y-((now.getMonth()<mo-1||(now.getMonth()===mo-1&&now.getDate()<d))?1:0);
+    if(age<18)return {err:"This form is for people aged 18 or above."};
+    if(age>80)return {err:"That date of birth does not look right. Please check the year."};
+    return {iso:y+"-"+("0"+mo).slice(-2)+"-"+("0"+d).slice(-2)};
+  }
+  function emailOk(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)}
+  function jobsDone(){return !!($$("#applybox input[data-opt]:checked").length||($("#other-on")&&$("#other-on").checked&&val("applyOther")))}
+  function firstWork(p){var r=$('[data-row="work"]');var el=r&&r.querySelector('[data-p="'+p+'"]');return el&&el.value.trim()}
+
+  /* Every field that counts towards the progress bar. m=1 means it must be filled to submit. */
+  function fields(){
+    var salary=parseFloat(money(val("expSalary")));
+    var list=[
+      {l:"Full Name",el:"#name",ok:!!val("name"),m:1},
+      {l:"Mobile Number",el:"#phone",ok:!!phone10(val("phone")),m:1},
+      {l:"Email",el:"#email",ok:emailOk(val("email")),m:1},
+      {l:"Gender",el:"#gender",ok:!!val("gender"),m:1},
+      {l:"Date of Birth",el:"#dob",ok:!!dobCheck(val("dob")).iso,m:1},
+      {l:"Current Location",el:"#city",ok:!!val("city"),m:1},
+      {l:"Preferred Location",el:"#prefCity",ok:!!val("prefCity"),m:1},
+      {l:"Highest Qualification",el:"#education",ok:!!val("education"),m:1},
+      {l:"Kinds of jobs you are interested in",el:"#applybox",ok:jobsDone(),m:1},
+      {l:"Expected Salary",el:"#expSalary",ok:salary>0,m:1},
+      {l:"Joining Availability",el:"#joining",ok:!!val("joining"),m:1},
+      {l:"Fresher or Experienced",el:"#type",ok:!!val("type"),m:1},
+      {l:"Your Resume",el:"#file",ok:!!fileObj,m:1},
+      {l:"Skills",el:'[data-row="skill"] input',ok:$$('[data-row="skill"] [data-p="Skill"]').some(function(i){return i.value.trim()}),m:0}
+    ];
+    if(val("type")==="Experience"){
+      list.push({l:"Total Experience",el:"#exp",ok:!!money(val("exp")),m:0},{l:"Current Salary",el:"#curSalary",ok:!!money(val("curSalary")),m:0},
+        {l:"Company Name",el:'[data-row="work"] [data-p="Company"]',ok:!!firstWork("Company"),m:0},{l:"Designation",el:'[data-row="work"] [data-p="Role"]',ok:!!firstWork("Role"),m:0},
+        {l:"Company Salary",el:'[data-row="work"] [data-p="Salary"]',ok:!!money(firstWork("Salary")),m:0},{l:"Company Year",el:'[data-row="work"] [data-p="Year"]',ok:!!firstWork("Year"),m:0});
+    }
+    return list;
+  }
+  function progress(){
+    var f=fields(),done=f.filter(function(x){return x.ok}).length,pct=Math.floor(done*100/f.length);
+    var miss=f.filter(function(x){return x.m&&!x.ok}).length,ready=!miss&&done*100>=90*f.length;
+    $("#pg-text").textContent=pct+"% complete";
+    $("#pg-fill").style.width=pct+"%";
+    var bar=$("#pg-bar");bar.setAttribute("aria-valuenow",pct);bar.className="pg-bar"+(ready?" ready":"");
+    $("#pg-note").textContent=ready?"Ready to submit":(miss?"Fill the fields marked * to continue":"Add a few more details to reach 90%");
+    return {f:f,pct:pct,done:done,miss:miss,ready:ready};
+  }
+
   function gather(){
-    var rec={name:val("name"),phone:phone10(val("phone")),email:val("email"),gender:val("gender"),dob:val("dob"),city:val("city"),prefCity:val("prefCity"),
+    var rec={name:val("name"),phone:phone10(val("phone")),email:val("email"),gender:val("gender"),dob:dobCheck(val("dob")).iso||"",city:val("city"),prefCity:val("prefCity"),
       education:val("education"),expSalary:money(val("expSalary")),joining:val("joining"),type:val("type"),hp:val("hp")};
     rec.apply=$$("#applybox input[data-opt]:checked").map(function(i){return i.getAttribute("data-opt")});
+    rec.applyOther=($("#other-on")&&$("#other-on").checked)?val("applyOther"):"";
     rec.skills=$$('[data-row="skill"] [data-p="Skill"]').map(function(i){return i.value.trim()}).filter(Boolean);
     if(rec.type==="Experience"){
       rec.exp=money(val("exp"));rec.curSalary=money(val("curSalary"));
@@ -317,19 +401,25 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     }
     return rec;
   }
-
   $("#f").addEventListener("submit",function(ev){
     ev.preventDefault();
     if(sending)return;
     hideErr();
-    var name=val("name"),ph=val("phone"),em=val("email");
-    if(!name)return fail("Please enter your full name.",$("#name"));
-    if(!phone10(ph))return fail("Please enter a valid 10-digit mobile number.",$("#phone"));
-    if(em&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em))return fail("The email address does not look right.",$("#email"));
+    var ph=val("phone"),em=val("email"),dv=val("dob");
     if(optsLoaded===false)return fail("The job options are still loading. Please wait a moment and try again.",null);
     if(optsLoaded==="fail")return fail("The job options could not be loaded. Please press Try again in the Job Preference section.",null);
-    if(opts.length&&!$$("#applybox input[data-opt]:checked").length){var ab=$("#applybox");ab.setAttribute("aria-invalid","true");return fail("Please tick at least one kind of job you are interested in.",ab.querySelector("input"))}
-    if(!fileObj)return fail("Please upload your resume as a PDF file.",$("#file"));
+    if(ph&&!phone10(ph))return fail("Please enter a valid 10-digit mobile number.",$("#phone"));
+    if(em&&!emailOk(em))return fail("The email address does not look right.",$("#email"));
+    if(dv&&dobCheck(dv).err)return fail(dobCheck(dv).err,$("#dob"));
+    var otherOn=!!($("#other-on")&&$("#other-on").checked);
+    if(otherOn&&!val("applyOther"))return fail("Please type the job you are looking for.",$("#applyOther"));
+    var st=progress(),missing=st.f.filter(function(x){return x.m&&!x.ok});
+    if(missing.length){
+      var els=missing.map(function(x){return $(x.el)});
+      els.forEach(function(el){if(el&&el.id!=="file")el.setAttribute("aria-invalid","true")});
+      return fail("Please fill in: "+missing.map(function(x){return x.l}).join(", ")+".",els[0]&&els[0].id==="applybox"?els[0].querySelector("input"):els[0]);
+    }
+    if(!st.ready)return fail("Your form is "+st.pct+"% complete. Please fill in at least 90%. Adding your experience details and skills will get you there.",$('#type'));
     if(!$("#consent").checked)return fail("Please tick the box to agree before submitting.",$("#consent"));
 
     sending=true;var btn=$("#send");btn.disabled=true;btn.textContent="Sending... please wait";
@@ -338,7 +428,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
       return post({action:"apply",rec:rec,file:{name:fileObj.name,data:data},consent:true,t:Date.now()-started,src:srcTag()},90000);
     }).then(function(){
       try{if(window.fbq)window.fbq("track","Lead")}catch(e){}
-      $("#f").hidden=true;$("#inapp").hidden=true;$("#done").hidden=false;
+      $("#f").hidden=true;$("#progress").hidden=true;$("#inapp").hidden=true;$("#done").hidden=false;
       try{window.scrollTo({top:0,behavior:"smooth"})}catch(e){window.scrollTo(0,0)}
     }).catch(function(e){
       sending=false;btn.disabled=false;btn.textContent="Submit my details";
@@ -346,6 +436,10 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     });
   });
 
+  document.addEventListener("input",function(e){if(e.target.removeAttribute)e.target.removeAttribute("aria-invalid")});
+  document.addEventListener("change",function(e){if(e.target.removeAttribute)e.target.removeAttribute("aria-invalid")});
+  ["input","change","click"].forEach(function(t){document.addEventListener(t,function(){setTimeout(progress,0)})});
+  progress();
   loadOpts();
 })();
 </script>
