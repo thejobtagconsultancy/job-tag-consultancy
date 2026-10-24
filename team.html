@@ -289,6 +289,7 @@ label{font-weight:600;font-size:.9rem}
     joining:{label:"Joining Availability",type:"select",options:JOINING},
     type:{label:"Fresher or Experience",type:"select",options:TYPES},
     exp:{label:"Total Experience (years)",mode:"decimal",ph:"e.g. 2.5"},
+    expDetails:{label:"Experience Details",type:"textarea",rows:5,wide:1,ph:"Describe your work, roles and achievements"},
     skills:{label:"Skills",ph:"e.g. MS Excel, Tally, Typing, Sales",wide:1},
     source:{label:"Source of Candidate",type:"select",options:SOURCES},
     remarks:{label:"Remarks",type:"textarea",rows:3,wide:1}
@@ -301,7 +302,7 @@ label{font-weight:600;font-size:.9rem}
   (function(){
     var n,i;
     for(n=1;n<=MAXW;n++)WF.forEach(function(p){CSV_KEYS.push("w"+n+p);F["w"+n+p]={label:"Company "+n+" "+WLABEL[p].replace("Company Name","Name").replace(" (₹ per month)","")}});
-    CSV_KEYS.push("skills","source");
+    CSV_KEYS.push("expDetails","skills","source");
     for(n=1;n<=MAXI;n++)IF.forEach(function(p){CSV_KEYS.push("int"+n+p);F["int"+n+p]={label:"Interview "+n+" "+p}});
     CSV_KEYS.push("remarks","resume");F.resume={label:"Resume Link"};
   })();
@@ -618,7 +619,8 @@ label{font-weight:600;font-size:.9rem}
       '<fieldset><legend>Work Experience</legend><div class="grid">'+fieldHTML("type",v.type||"")+'</div>'+
         '<div id="expbox" class="subgrid" hidden><div class="grid">'+fieldHTML("exp",v.exp||"")+'</div>'+
         '<div id="worklist">'+works.map(workRowHTML).join("")+'</div>'+
-        '<div><button class="btn sm addrow" id="add-work" type="button" data-act="add-work">+ Add another company</button></div></div></fieldset>'+
+        '<div><button class="btn sm addrow" id="add-work" type="button" data-act="add-work">+ Add another company</button></div>'+
+        '<div class="grid">'+fieldHTML("expDetails",v.expDetails||"")+'</div></div></fieldset>'+
       '<fieldset><legend>Skills</legend><div id="skilllist">'+(skillsOf(v).length?skillsOf(v):[""]).map(skillRowHTML).join("")+'</div>'+
         '<div><button class="btn sm addrow" id="add-skill" type="button" data-act="add-skill">+ Add another skill</button></div></fieldset>'+
       '<fieldset><legend>Source of Candidate</legend>'+grid(["source"],v)+'</fieldset>'+
@@ -657,7 +659,7 @@ label{font-weight:600;font-size:.9rem}
       ["Current Salary",money(c.curSalary)+" per month",c.curSalary],["Expected Salary",money(c.expSalary)+" per month",c.expSalary],
       ["Joining Availability",esc(c.joining),c.joining]]));
     var wk=workOf(c);
-    sec("Work Experience",rowsOf([["Type",esc(c.type),c.type],["Total Experience",esc(c.exp)+" years",c.exp]])+
+    sec("Work Experience",rowsOf([["Type",esc(c.type),c.type],["Total Experience",esc(c.exp)+" years",c.exp],["Experience Details",'<span style="white-space:pre-wrap">'+esc(c.expDetails)+'</span>',c.expDetails]])+
       wk.map(function(e,i){return '<div class="vcard"><h3>Company '+(i+1)+'</h3>'+dl([["Company Name",esc(e.Company)],["Designation",esc(e.Role)],["Salary",e.Salary?money(e.Salary)+" per month":""],["Year",esc(e.Year)]].filter(function(r){return r[1]}))+'</div>'}).join(""));
     sec("Skills",rowsOf([["Skills",skillsOf(c).map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(" "),skillsOf(c).length?"x":""]]));
     sec("Source of Candidate",rowsOf([["Source",esc(c.source),c.source]]));
@@ -687,8 +689,10 @@ label{font-weight:600;font-size:.9rem}
       block("Basic Details",tbl([row("Gender",esc(c.gender)),row("Date of Birth",esc(fmtDay(c.dob))),row("Current Location",esc(c.city)),row("Preferred Location",esc(c.prefCity))]))+
       block("Education",tbl([row("Highest Qualification",esc(c.education))]))+
       block("Job Preference",tbl([row("Applying For",applyOf(c).map(esc).join(", ")),row("Current Salary",has(c.curSalary)?money(c.curSalary)+" per month":""),row("Expected Salary",has(c.expSalary)?money(c.expSalary)+" per month":""),row("Joining Availability",esc(c.joining))]))+
-      block("Work Experience",tbl([row("Experience Level",esc(c.type)),row("Total Experience",has(c.exp)?esc(c.exp)+" years":"")])+work)+
-      block("Skills",tbl([row("Skills",skillsOf(c).map(esc).join(", "))]));
+      block("Work Experience",tbl([row("Experience Level",esc(c.type)),row("Total Experience",has(c.exp)?esc(c.exp)+" years":"")])+work+
+        (has(c.expDetails)?'<div class="co"><b>Experience Details</b><div class="long">'+esc(c.expDetails)+'</div></div>':""))+
+      block("Skills",skillsOf(c).length?'<ul class="pts">'+skillsOf(c).map(function(x){return '<li>'+esc(x)+'</li>'}).join("")+'</ul>':"")+
+      block("Remarks",has(c.remarks)?'<div class="long">'+esc(c.remarks)+'</div>':"");
     return '<!doctype html><html><head><meta charset="utf-8"><title>Candidate Profile - '+esc(c.name||"")+' - The Job Tag Consultancy</title><style>'+
       '@page{size:A4;margin:16mm 14mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
       'body{font-family:Arial,Helvetica,sans-serif;color:#26242a;font-size:12.5px;line-height:1.5;margin:0}'+
@@ -698,6 +702,7 @@ label{font-weight:600;font-size:.9rem}
       '.name{font-size:22px;font-weight:700;margin:0 0 2px;position:relative;z-index:1}.sub{color:#6a665f;margin-bottom:6px;position:relative;z-index:1}'+
       'h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#B3203A;border-bottom:1px solid #e3ded5;padding-bottom:3px;margin:16px 0 6px;position:relative;z-index:1}'+
       'table{width:100%;border-collapse:collapse;position:relative;z-index:1}th{width:34%;text-align:left;color:#6a665f;font-weight:600;padding:3px 8px 3px 0;vertical-align:top}td{padding:3px 0}'+
+      '.long{white-space:pre-wrap;position:relative;z-index:1;margin-top:3px}ul.pts{margin:2px 0 0 18px;padding:0;position:relative;z-index:1}ul.pts li{margin:2px 0}'+
       '.co{padding:5px 0;border-bottom:1px dashed #e3ded5;position:relative;z-index:1}.muted{color:#6a665f}'+
       '.foot{margin-top:22px;padding-top:8px;border-top:1px solid #e3ded5;color:#6a665f;font-size:11px;position:relative;z-index:1}'+
       '</style></head><body>'+
@@ -742,13 +747,13 @@ label{font-weight:600;font-size:.9rem}
   }
 
   /* ---------- save, status, delete ---------- */
-  var STATIC_KEYS=["status","name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","source","remarks"];
+  var STATIC_KEYS=["status","name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","expDetails","source","remarks"];
   function gather(){
     var rec={};
     STATIC_KEYS.forEach(function(k){var el=$("#f-"+k);rec[k]=el?el.value.trim():""});
     rec.apply=$$("#applybox input[data-opt]:checked").map(function(i){return i.getAttribute("data-opt")});
     rec.skills=$$('[data-row="skill"] [data-p="Skill"]').map(function(i){return i.value.trim()}).filter(Boolean);
-    if(rec.type!=="Experience"){rec.exp=""}
+    if(rec.type!=="Experience"){rec.exp="";rec.expDetails=""}
     $$('[data-row="work"]').forEach(function(r,i){
       if(rec.type!=="Experience")return;
       WF.forEach(function(p){rec["w"+(i+1)+p]=r.querySelector('[data-p="'+p+'"]').value.trim()});
@@ -837,7 +842,7 @@ label{font-weight:600;font-size:.9rem}
     if(!ex){openForm(null,a);return}
     /* the candidate's new details go over the saved ones; empty answers do not erase anything */
     var m={};
-    ["name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","source"].forEach(function(k){if(has(a[k]))m[k]=a[k]});
+    ["name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","expDetails","source"].forEach(function(k){if(has(a[k]))m[k]=a[k]});
     if(a.apply.length)m.apply=a.apply;
     if(a.skills.length)m.skills=a.skills;
     if(a.type==="Experience"){for(var n=1;n<=MAXW;n++)WF.forEach(function(p){m["w"+n+p]=a["w"+n+p]||""})}
