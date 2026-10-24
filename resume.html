@@ -162,7 +162,6 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
         </div>
         <div id="worklist"></div>
         <button class="btn add" id="add-work" type="button">+ Add another company</button>
-        <div class="fld"><label for="expDetails">Experience Details <span class="opt">(describe your work, roles and achievements)</span></label><textarea id="expDetails" rows="5" maxlength="3000" placeholder="e.g. I handled recruitment for 3 clients, screened 50+ resumes a week and closed 20 positions in 6 months."></textarea></div>
       </div>
     </fieldset>
 
@@ -214,7 +213,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
 (function(){
   var API_URL="https://script.google.com/macros/s/AKfycbwJdrLkWQZRRPKLqXi3y6fBBJ2PbtNSAd0H1mDr8b0aljJuxq9dcg0vZbhu8YodU2iWdg/exec";
   var MAXW=5, MAX_BYTES=5*1024*1024, started=Date.now();
-  var WF=["Company","Role","Salary","Year"];
+  var WF=["Company","Role","Salary","Year","Details"];
   var WLABEL={Company:"Company Name",Role:"Designation",Salary:"Salary (₹ per month)",Year:"Year"};
   var opts=[], optsLoaded=false, sending=false, fileObj=null;
 
@@ -261,7 +260,8 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
       '<div class="fld"><label>'+WLABEL.Company+'</label><input type="text" data-p="Company" maxlength="100" autocomplete="off"></div>'+
       '<div class="fld"><label>'+WLABEL.Role+'</label><input type="text" data-p="Role" maxlength="100" autocomplete="off"></div>'+
       '<div class="two"><div class="fld"><label>'+WLABEL.Salary+'</label><input type="text" data-p="Salary" inputmode="numeric" maxlength="12" autocomplete="off"></div>'+
-      '<div class="fld"><label>'+WLABEL.Year+'</label><input type="text" data-p="Year" maxlength="40" placeholder="e.g. 2021 - 2023" autocomplete="off"></div></div></div>';
+      '<div class="fld"><label>'+WLABEL.Year+'</label><input type="text" data-p="Year" maxlength="40" placeholder="e.g. 2021 - 2023" autocomplete="off"></div></div>'+
+      '<div class="fld"><label>Experience Details <span class="opt">(what work did you do in this company?)</span></label><textarea data-p="Details" rows="4" maxlength="2000" placeholder="e.g. Handled recruitment for 3 clients, screened 50+ resumes a week and closed 20 positions in 6 months."></textarea></div></div>';
   }
   function skillRow(){
     return '<div class="skillrow" data-row="skill"><input type="text" data-p="Skill" maxlength="100" placeholder="e.g. MS Excel, Tally, Typing, Sales" aria-label="Skill" autocomplete="off"><button class="btn ghost sm" type="button" data-act="rm">Remove</button></div>';
@@ -408,7 +408,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     rec.applyOther=($("#other-on")&&$("#other-on").checked)?val("applyOther"):"";
     rec.skills=$$('[data-row="skill"] [data-p="Skill"]').map(function(i){return i.value.trim()}).filter(Boolean);
     if(rec.type==="Experience"){
-      rec.exp=money(val("exp"));rec.curSalary=money(val("curSalary"));rec.expDetails=val("expDetails");
+      rec.exp=money(val("exp"));rec.curSalary=money(val("curSalary"));
       $$('[data-row="work"]').forEach(function(r,i){
         WF.forEach(function(p){var v=r.querySelector('[data-p="'+p+'"]').value.trim();rec["w"+(i+1)+p]=p==="Salary"?money(v):v});
       });
