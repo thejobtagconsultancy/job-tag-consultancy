@@ -48,6 +48,7 @@ legend{font-weight:700;font-size:1.02rem;padding:0 8px;margin-left:-8px}
 label,.lbl{display:block;font-weight:600;font-size:.94rem;margin-bottom:6px}
 .opt{font-weight:400;color:var(--muted)}
 .hint{color:var(--muted);font-size:.88rem;margin-top:5px}
+textarea{width:100%;min-height:120px;padding:.7rem .85rem;border:1px solid var(--line);border-radius:10px;background:var(--field);font-size:16px;resize:vertical;line-height:1.5}
 input[type=text],input[type=tel],input[type=email],input[type=date],select{
   width:100%;min-height:50px;padding:.6rem .85rem;border:1px solid var(--line);border-radius:10px;background:var(--field);font-size:16px}
 select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:2.2rem}
@@ -161,6 +162,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
         </div>
         <div id="worklist"></div>
         <button class="btn add" id="add-work" type="button">+ Add another company</button>
+        <div class="fld"><label for="expDetails">Experience Details <span class="opt">(describe your work, roles and achievements)</span></label><textarea id="expDetails" rows="5" maxlength="3000" placeholder="e.g. I handled recruitment for 3 clients, screened 50+ resumes a week and closed 20 positions in 6 months."></textarea></div>
       </div>
     </fieldset>
 
@@ -406,7 +408,7 @@ input[aria-invalid=true],select[aria-invalid=true]{border-color:var(--danger);ba
     rec.applyOther=($("#other-on")&&$("#other-on").checked)?val("applyOther"):"";
     rec.skills=$$('[data-row="skill"] [data-p="Skill"]').map(function(i){return i.value.trim()}).filter(Boolean);
     if(rec.type==="Experience"){
-      rec.exp=money(val("exp"));rec.curSalary=money(val("curSalary"));
+      rec.exp=money(val("exp"));rec.curSalary=money(val("curSalary"));rec.expDetails=val("expDetails");
       $$('[data-row="work"]').forEach(function(r,i){
         WF.forEach(function(p){var v=r.querySelector('[data-p="'+p+'"]').value.trim();rec["w"+(i+1)+p]=p==="Salary"?money(v):v});
       });
