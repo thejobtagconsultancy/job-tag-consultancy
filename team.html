@@ -270,7 +270,7 @@ label{font-weight:600;font-size:.9rem}
   var JOINING=["Immediate","Within 15 days","Within 1 month","Within 2 months","3 months or more"];
   var SOURCES=["Meta Ads","Referral","LinkedIn","Website","Walk-in"];
   var MAXW=5, MAXI=5;
-  var WF=["Company","Role","Salary","Year"];            /* work entry parts */
+  var WF=["Company","Role","Salary","Year","Details"];            /* work entry parts */
   var IF=["Date","Result","Notes"];                     /* interview entry parts */
 
   var F={
@@ -294,7 +294,7 @@ label{font-weight:600;font-size:.9rem}
     source:{label:"Source of Candidate",type:"select",options:SOURCES},
     remarks:{label:"Remarks",type:"textarea",rows:3,wide:1}
   };
-  var WLABEL={Company:"Company Name",Role:"Designation",Salary:"Salary (₹ per month)",Year:"Year"};
+  var WLABEL={Company:"Company Name",Role:"Designation",Salary:"Salary (₹ per month)",Year:"Year",Details:"Experience Details"};
   var ILABEL={Date:"Interview Date",Result:"Interview Result",Notes:"Interview Notes"};
 
   /* order used for search text and for the Excel/CSV export */
@@ -558,7 +558,7 @@ label{font-weight:600;font-size:.9rem}
   function workRowHTML(e){
     e=e||{};
     return '<div class="rowcard" data-row="work"><div class="rc-head"><b class="rc-title"></b><button class="btn ghost sm" type="button" data-act="rm-row">Remove</button></div><div class="grid">'+
-      WF.map(function(p){return '<div class="fld"><label>'+WLABEL[p]+'</label><input type="'+"text"+'" data-p="'+p+'"'+(p==="Salary"?' inputmode="numeric"':"")+' value="'+esc(e[p]||"")+'" placeholder="'+(p==="Year"?"e.g. 2021 - 2023":"")+'" autocomplete="off"></div>'}).join("")+
+      WF.map(function(p){if(p==="Details")return '<div class="fld wide"><label>Experience Details <span class="hint">(what work did they do in this company?)</span></label><textarea rows="4" data-p="Details" placeholder="Describe the work, roles and achievements in this company">'+esc(e.Details||"")+'</textarea></div>';return '<div class="fld"><label>'+WLABEL[p]+'</label><input type="'+"text"+'" data-p="'+p+'"'+(p==="Salary"?' inputmode="numeric"':"")+' value="'+esc(e[p]||"")+'" placeholder="'+(p==="Year"?"e.g. 2021 - 2023":"")+'" autocomplete="off"></div>'}).join("")+
       '</div></div>';
   }
   function ivRowHTML(e){
@@ -620,7 +620,7 @@ label{font-weight:600;font-size:.9rem}
         '<div id="expbox" class="subgrid" hidden><div class="grid">'+fieldHTML("exp",v.exp||"")+'</div>'+
         '<div id="worklist">'+works.map(workRowHTML).join("")+'</div>'+
         '<div><button class="btn sm addrow" id="add-work" type="button" data-act="add-work">+ Add another company</button></div>'+
-        '<div class="grid">'+fieldHTML("expDetails",v.expDetails||"")+'</div></div></fieldset>'+
+        '</div></fieldset>'+
       '<fieldset><legend>Skills</legend><div id="skilllist">'+(skillsOf(v).length?skillsOf(v):[""]).map(skillRowHTML).join("")+'</div>'+
         '<div><button class="btn sm addrow" id="add-skill" type="button" data-act="add-skill">+ Add another skill</button></div></fieldset>'+
       '<fieldset><legend>Source of Candidate</legend>'+grid(["source"],v)+'</fieldset>'+
@@ -660,7 +660,7 @@ label{font-weight:600;font-size:.9rem}
       ["Joining Availability",esc(c.joining),c.joining]]));
     var wk=workOf(c);
     sec("Work Experience",rowsOf([["Type",esc(c.type),c.type],["Total Experience",esc(c.exp)+" years",c.exp],["Experience Details",'<span style="white-space:pre-wrap">'+esc(c.expDetails)+'</span>',c.expDetails]])+
-      wk.map(function(e,i){return '<div class="vcard"><h3>Company '+(i+1)+'</h3>'+dl([["Company Name",esc(e.Company)],["Designation",esc(e.Role)],["Salary",e.Salary?money(e.Salary)+" per month":""],["Year",esc(e.Year)]].filter(function(r){return r[1]}))+'</div>'}).join(""));
+      wk.map(function(e,i){return '<div class="vcard"><h3>Company '+(i+1)+'</h3>'+dl([["Company Name",esc(e.Company)],["Designation",esc(e.Role)],["Salary",e.Salary?money(e.Salary)+" per month":""],["Year",esc(e.Year)],["Experience Details",e.Details?'<span style="white-space:pre-wrap">'+esc(e.Details)+'</span>':""]].filter(function(r){return r[1]}))+'</div>'}).join(""));
     sec("Skills",rowsOf([["Skills",skillsOf(c).map(function(x){return '<span class="tag">'+esc(x)+'</span>'}).join(" "),skillsOf(c).length?"x":""]]));
     sec("Source of Candidate",rowsOf([["Source",esc(c.source),c.source]]));
     var iv=intsOf(c);
@@ -683,7 +683,7 @@ label{font-weight:600;font-size:.9rem}
     function tbl(rows){var h=rows.join("");return h?'<table>'+h+'</table>':""}
     var wk=workOf(c);
     var work=wk.map(function(e,i){return '<div class="co"><b>'+esc(e.Company||("Company "+(i+1)))+'</b>'+(e.Role?' — '+esc(e.Role):"")+
-      '<div class="muted">'+[e.Year?esc(e.Year):"",e.Salary?"Salary "+money(e.Salary)+" per month":""].filter(Boolean).join(" · ")+'</div></div>'}).join("");
+      '<div class="muted">'+[e.Year?esc(e.Year):"",e.Salary?"Salary "+money(e.Salary)+" per month":""].filter(Boolean).join(" · ")+'</div>'+(e.Details?'<div class="long">'+esc(e.Details)+'</div>':"")+'</div>'}).join("");
     var age="";
     var body=
       block("Basic Details",tbl([row("Gender",esc(c.gender)),row("Date of Birth",esc(fmtDay(c.dob))),row("Current Location",esc(c.city)),row("Preferred Location",esc(c.prefCity))]))+
@@ -747,13 +747,13 @@ label{font-weight:600;font-size:.9rem}
   }
 
   /* ---------- save, status, delete ---------- */
-  var STATIC_KEYS=["status","name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","expDetails","source","remarks"];
+  var STATIC_KEYS=["status","name","phone","email","gender","dob","city","prefCity","education","curSalary","expSalary","joining","type","exp","source","remarks"];
   function gather(){
     var rec={};
     STATIC_KEYS.forEach(function(k){var el=$("#f-"+k);rec[k]=el?el.value.trim():""});
     rec.apply=$$("#applybox input[data-opt]:checked").map(function(i){return i.getAttribute("data-opt")});
     rec.skills=$$('[data-row="skill"] [data-p="Skill"]').map(function(i){return i.value.trim()}).filter(Boolean);
-    if(rec.type!=="Experience"){rec.exp="";rec.expDetails=""}
+    if(rec.type!=="Experience"){rec.exp=""}
     $$('[data-row="work"]').forEach(function(r,i){
       if(rec.type!=="Experience")return;
       WF.forEach(function(p){rec["w"+(i+1)+p]=r.querySelector('[data-p="'+p+'"]').value.trim()});
